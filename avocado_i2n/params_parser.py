@@ -39,18 +39,37 @@ from virttest.utils_params import Params
 from avocado.core.settings import settings
 
 
-class EmptyCartesianProduct(Exception):
+class CartesianProductError(Exception):
+    """Error related to unacceptable Cartesian product of variants"""
+    pass
+
+
+class EmptyCartesianProduct(CartesianProductError):
     """Empty Cartesian product of variants"""
 
     def __init__(self, message):
         """
-        Initialize an empty Cartesian product exception.
+        Initialize the exception.
 
         :param str message: additional message about the exception
         """
         message = "Empty Cartesian product of parameters!\n" + message
         message = "Check for self-excluding variants in your current configuration:\n" + message
         super(EmptyCartesianProduct, self).__init__(message)
+
+
+class NonuniqueCartesianProduct(CartesianProductError):
+    """Non-unique Cartesian product of variants when a unique one is required"""
+
+    def __init__(self, message):
+        """
+        Initialize the exception.
+
+        :param str message: additional message about the exception
+        """
+        message = "Nonunique Cartesian product of parameters!\n" + message
+        message = "Check for self-multiplying variants in your current configuration:\n" + message
+        super(NonuniqueCartesianProduct, self).__init__(message)
 
 
 ###################################################################
