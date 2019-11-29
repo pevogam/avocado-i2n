@@ -142,6 +142,17 @@ class TestNode(object):
         """
         return ".manual." in self.params["name"]
 
+    def is_singleton(self):
+        """
+        Check if the test node is a singleton test (only one test object is
+        assigned to the node.
+        """
+        singleton = len(self.objects) == 1
+        if singleton:
+            assert self.objects[0].name == self.params["main_vm"], "%s != %s" % (self.objects[0].name, self.params["main_vm"])
+            assert self.params["vms"] == self.params["main_vm"], "%s != %s" % (self.params["vms"], self.params["main_vm"])
+        return singleton
+
     def is_setup_ready(self):
         """
         All dependencies of the test were run or there were none, so it can
@@ -248,3 +259,8 @@ class TestNode(object):
         :param bool verbose: whether to show generated parameter dictionaries
         """
         self._params_cache = self.config.get_params(show_dictionaries=verbose)
+
+        # make sure cache is already available before this parameter-dependent check
+        # which if true will refine the parameters for a singleton test
+        if self.is_singleton():
+            self._params_cache = self._params_cache.object_params(self._params_cache["main_vm"])
