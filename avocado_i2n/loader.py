@@ -323,6 +323,10 @@ class CartesianLoader(VirtTestLoader):
         :return: test factories as tuples of the test class and its parameters
         :rtype: [(type, {str, str})]
         """
+        try:
+            cartesian_parser = self._get_parser()
+        except Exception as details:
+            return self._report_bad_discovery(url, details, which_tests)
         if references is not None:
             assert references.split() == self.config["params"]
         param_str, nodes_str, object_strs = self.config["param_str"], self.config["tests_str"], self.config["vm_strs"]
