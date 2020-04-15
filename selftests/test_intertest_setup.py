@@ -397,7 +397,7 @@ class IntertestSetupTest(unittest.TestCase):
         DummyTestRunning.asserted_tests = [
             {"shortname": "^internal.stateless.0root.vm3", "vms": "^vm3$", "set_state": "^root$", "set_type": "^on$"},
             {"shortname": "^internal.stateless.0preinstall.vm3", "vms": "^vm3$"},
-            {"shortname": "^original.unattended_install.*vm3", "vms": "^vm3$", "cdrom_cd1": ".*ubuntu-14.04.*\.iso$"},
+            {"shortname": "^original.unattended_install.*vm3", "vms": "^vm3$", "cdrom_cd1": ".*ubuntu-16.04.*\.iso$"},
             {"shortname": "^internal.stateless.manage.start.vm3", "vms": "^vm3$", "set_state": "^install$", "get_type": "^on$", "set_type": "^on$"},
             {"shortname": "^internal.permanent.customize.vm3", "vms": "^vm3$", "get_type": "^on$", "set_type": "^on$"},
             {"shortname": "^internal.stateless.manage.start.vm3", "vms": "^vm3$", "set_state": "^ready$", "get_type": "^on$", "set_type": "^on$"},
