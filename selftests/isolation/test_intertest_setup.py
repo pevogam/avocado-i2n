@@ -408,7 +408,7 @@ class IntertestSetupTest(Test):
         DummyStateControl.asserted_states["unset"] = {"on_customize": {self.shared_pool: 0}}
         DummyTestRun.asserted_tests = [
             {"shortname": "^internal.stateless.noop.vm3", "vms": "^vm3$", "type": "^shared_configure_install$"},
-            {"shortname": "^original.unattended_install.*vm3", "vms": "^vm3$", "cdrom_cd1": r".*ubuntu-14.04.*\.iso$", "set_state_images": "^install$"},
+            {"shortname": "^original.unattended_install.*vm3", "vms": "^vm3$", "cdrom_cd1": r".*ubuntu-24.04.*\.iso$", "set_state_images": "^install$"},
             {"shortname": "^internal.automated.customize.vm3", "vms": "^vm3$", "set_state_images": "^customize$"},
             {"shortname": "^internal.stateless.manage.start.vm3", "vms": "^vm3$", "set_state_vms": "^ready$"},
         ]
