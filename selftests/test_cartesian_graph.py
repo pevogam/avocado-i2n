@@ -5,10 +5,12 @@ import unittest.mock as mock
 import shutil
 import re
 
+import logging
+logging.basicConfig(level=10)
+
 from avocado.core import exceptions
 from avocado.core.suite import TestSuite
 
-import unittest_importer
 from avocado_i2n import params_parser as param
 from avocado_i2n.cartgraph import TestGraph
 from avocado_i2n.loader import CartesianLoader

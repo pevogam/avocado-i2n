@@ -57,7 +57,7 @@ class EmptyCartesianProduct(Exception):
 ###################################################################
 
 
-_devel_tp_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "tp_folder"))
+_devel_tp_folder = "/usr/share/avocado-plugins-i2n/tp_folder"
 settings.register_option(section='i2n.common',
                          key='suite_path',
                          key_type=str,
