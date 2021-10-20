@@ -29,6 +29,13 @@ ss.BACKENDS = {"qcow2": qcow2.QCOW2Backend, "qcow2ext": qcow2.QCOW2ExtBackend,
                "vmnet": vmnet.VMNetBackend}
 ramfile.RamfileBackend.image_state_backend = qcow2.QCOW2ExtBackend
 
+"""
+# load env here
+from virttest import data_dir, utils_env
+env_filename = os.path.join(data_dir.get_tmp_dir(),
+                            self.params.get("env", "env"))
+env = utils_env.Env(env_filename, utils_env.get_env_version())
+"""
 try:
     if ACTION == "check":
         assert ss.check_states(Params(PARAMS), env=None)
@@ -41,6 +48,20 @@ try:
 finally:
     for session in pool.TransferOps._session_cache.values():
         session.close()
+    """
+    try:
+        env.save()
+    except Exception as details:
+        import stacktrace
+        try:
+            pickle.dumps(env.data)
+        except Exception:
+            self.log.warn("Unable to save environment: %s",
+                            stacktrace.str_unpickable_object(env.data))
+        else:
+            self.log.warn("Unable to save environment: %s (%s)", details,
+                            env.data)
+    """
 
 
 logging.info("%s control file finished.", NAME)
