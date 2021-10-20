@@ -366,7 +366,30 @@ class TestNode(object):
             node_params[f"soft_boot_{test_object.key}_{test_object.suffix}"] = "no"
 
         if not is_leaf:
+            """
+            # load env here
+            from virttest import data_dir, utils_env
+            env_filename = os.path.join(data_dir.get_tmp_dir(),
+                                        self.params.get("env", "env"))
+            env = utils_env.Env(env_filename, utils_env.get_env_version())
+            try:
+            """
             self.should_run = not ss.check_states(node_params, None)
+            """
+            finally:
+                try:
+                    env.save()
+                except Exception as details:
+                    import stacktrace
+                    try:
+                        pickle.dumps(env.data)
+                    except Exception:
+                        self.log.warn("Unable to save environment: %s",
+                                      stacktrace.str_unpickable_object(env.data))
+                    else:
+                        self.log.warn("Unable to save environment: %s (%s)", details,
+                                      env.data)
+            """
         logging.info("The test node %s %s run", self, "should" if self.should_run else "should not")
 
     def validate(self):
