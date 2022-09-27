@@ -681,6 +681,13 @@ class TestNode(object):
 
         if not is_leaf:
             session = self.get_session_to_net()
+
+            @door.run_remotely
+            def check_remote_states(params, env):
+                from avocado_i2n.states import setup as ss
+                from virttest.utils_params import Params
+                print(ss.check_states(Params(params), env=None))
+
             control_path = os.path.join(self.params["suite_path"], "controls", "pre_state.control")
             mod_control_path = door.set_subcontrol_parameter(control_path, "action", "check")
             mod_control_path = door.set_subcontrol_parameter_dict(mod_control_path, "params", node_params)
@@ -692,6 +699,7 @@ class TestNode(object):
                     should_run = True
                 else:
                     raise RuntimeError("Could not complete state scan due to control file error")
+            #self.should_run = check_remote_states(session, node_params, env=None)
         logging.info(f"The test node {self} %s run from a scan on {slothost + '/' + slot}",
                      "should" if should_run else "should not")
         return should_run
