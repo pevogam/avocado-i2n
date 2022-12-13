@@ -80,6 +80,9 @@ jobs:
       #  uses: codecov/codecov-action@v3
       #  with:
       #   verbose: true
+      - name: Collect test results
+        uses: actions/upload-artifact@v3
+        path: /home/runner/avocado/job-results
       - name: Cleaning up avocado(-vt) libs
         run: |
           rm -rf avocado-vt-libs
