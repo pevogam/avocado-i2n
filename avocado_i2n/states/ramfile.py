@@ -57,6 +57,8 @@ class RamfileBackend(SourcedStateBackend):
             f"Showing external states for vm {params['vms']} locally in {state_dir}"
         )
         vm_dir = os.path.join(state_dir, params["object_id"])
+        if not os.path.exists(vm_dir):
+            return []
         snapshots = os.listdir(vm_dir)
 
         images_states = set()
