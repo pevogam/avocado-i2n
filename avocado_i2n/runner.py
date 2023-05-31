@@ -68,7 +68,7 @@ class CartesianRunner(RunnerInterface):
 
     def __init__(self):
         """Construct minimal attributes for the Cartesian runner."""
-        self.tasks = []
+        self.tsm = []
         self.slots = []
 
         self.status_repo = None
@@ -81,17 +81,14 @@ class CartesianRunner(RunnerInterface):
         message_handler = MessageHandler()
         while True:
             try:
-                (_, task_id, _, index) = \
-                    self.status_repo.status_journal_summary_pop()
+                (_, task_id, _, index) = self.status_repo.status_journal_summary_pop()
 
             except IndexError:
                 await asyncio.sleep(0.05)
                 continue
 
             message = self.status_repo.get_task_data(task_id, index)
-            tasks_by_id = {str(runtime_task.task.identifier): runtime_task.task
-                           for runtime_task in self.tasks}
-            task = tasks_by_id.get(task_id)
+            task = self.tsm.tasks_by_id.get(task_id)
             message_handler.process_message(message, task, self.job)
 
     async def run_test(self, node):
@@ -150,13 +147,13 @@ class CartesianRunner(RunnerInterface):
                 task.spawner_handle = host
             elif spawner == "remote":
                 task.spawner_handle = node.get_session_to_net()
-        self.tasks += tasks
-
-        # TODO: use a single state machine for all test nodes when we are able
-        # to at least add requested tasks to it safely (using its locks)
-        await Worker(state_machine=TaskStateMachine(tasks, self.status_repo),
-                     spawner=node.spawner, max_running=1,
-                     task_timeout=self.job.config.get('task.timeout.running')).run()
+            await self.tsm.add_new_task(task)
+        await Worker(
+                state_machine=self.tsm,
+                spawner=node.spawner,
+                max_running=1,
+                task_timeout=self.job.config.get('task.timeout.running')
+            ).run()
 
     async def run_test_node(self, node):
         """
@@ -358,7 +355,6 @@ class CartesianRunner(RunnerInterface):
 
         self.job = job
         self.test_suite = test_suite
-        self.tasks = []
 
         self.status_repo = StatusRepo(self.job.unique_id)
         self.status_server = StatusServer(self.job.config.get('run.status_server_listen'),
@@ -368,6 +364,8 @@ class CartesianRunner(RunnerInterface):
         asyncio.ensure_future(self.status_server.serve_forever())
         # TODO: this needs more customization
         asyncio.ensure_future(self._update_status())
+
+        self.tsm = TaskStateMachine([], self.status_repo)
 
         graph = self._graph_from_suite(test_suite)
         params = self.job.config["param_dict"]
@@ -436,11 +434,7 @@ class CartesianRunner(RunnerInterface):
 
         # Update the overall summary with found test statuses, which will
         # determine the Avocado command line exit status
-        test_ids = [
-            runtime_task.task.identifier
-            for runtime_task in self.tasks
-            if runtime_task.task.category == "test"
-        ]
+        test_ids = [node.id_test for node in graph.nodes]
         summary.update(
             [
                 status.upper()
