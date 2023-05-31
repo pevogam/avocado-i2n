@@ -64,7 +64,7 @@ class TestRunner(RunnerInterface):
 
     def __init__(self) -> None:
         """Construct minimal attributes for the Cartesian runner."""
-        self.tasks = {}
+        self.tsm = []
 
         self.status_repo = None
         self.status_server = None
@@ -86,7 +86,7 @@ class TestRunner(RunnerInterface):
                 continue
 
             message = self.status_repo.get_task_data(task_id, index)
-            task = self.tasks.get(task_id)
+            task = self.tsm.tasks_by_id.get(task_id)
             message_handler.process_message(message, task, self.job)
 
     def all_results_ok(self) -> bool:
@@ -217,17 +217,10 @@ class TestRunner(RunnerInterface):
                     else:
                         break
 
-        self.tasks.update(
-            {
-                str(runtime_task.task.identifier): runtime_task.task
-                for runtime_task in tasks
-            }
-        )
-
-        # TODO: use a single state machine for all test nodes when we are able
-        # to at least add requested tasks to it safely (using its locks)
+            await self.tsm.add_new_task(task)
+        # TODO: perhaps we need to replace this with avocado's state machine (re)run?
         await Worker(
-            state_machine=TaskStateMachine(tasks, self.status_repo),
+            state_machine=self.tsm,
             spawner=node.started_worker.spawner,
             max_running=1,
             task_timeout=self.job.config.get("task.timeout.running"),
@@ -401,7 +394,6 @@ class TestRunner(RunnerInterface):
 
         self.job = job
         self.test_suite = test_suite
-        self.tasks = {}
 
         self.status_repo = StatusRepo(self.job.unique_id)
         self.status_server = StatusServer(
@@ -414,6 +406,8 @@ class TestRunner(RunnerInterface):
         self.loop.create_task(self.status_server.serve_forever())
         # TODO: this needs more customization
         self.loop.create_task(self._update_status())
+
+        self.tsm = TaskStateMachine([], self.status_repo)
 
         params = self.job.config["param_dict"]
         try:
@@ -447,9 +441,8 @@ class TestRunner(RunnerInterface):
 
         # Update the overall summary with found test statuses, which will
         # determine the Avocado command line exit status
-        test_ids = [
-            task.identifier for task in self.tasks.values() if task.category == "test"
-        ]
+        # TODO: use self.tsm instead?
+        test_ids = [node.id_test for node in graph.nodes]
         summary.update(
             [
                 status.upper()
