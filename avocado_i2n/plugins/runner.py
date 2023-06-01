@@ -364,6 +364,7 @@ class TestRunner(RunnerInterface):
             self.job.config.get("run.status_server_listen"), self.status_repo
         )
         loop = asyncio.get_event_loop()
+        loop.set_debug(True)
         loop.run_until_complete(self.status_server.create_server())
         asyncio.ensure_future(self.status_server.serve_forever())
         # TODO: this needs more customization
