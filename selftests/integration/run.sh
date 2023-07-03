@@ -32,7 +32,7 @@ slots = ['c101', 'c102', 'c103', 'c104', 'c105']
 EOF
 mkdir -p /etc/avocado/conf.d
 # TODO: use VT's approach to register the plugin config
-if [ ! -f /etc/avocado/conf.d/i2n.conf ]; then
+if [ ! -f "${i2n_config}" ]; then
     ln -s ~/avocado-i2n-libs/avocado_i2n/conf.d/i2n.conf "${i2n_config}"
 fi
 sed -i "s#suite_path = .*#suite_path = ${test_suite}#" "${i2n_config}"
