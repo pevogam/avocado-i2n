@@ -2038,7 +2038,7 @@ class CartesianGraphTest(Test):
     def setUp(self):
         self.config = {}
         self.config["param_dict"] = {"test_timeout": 100, "shared_pool": "/mnt/local/images/shared", "nets": "net1"}
-        self.config["tests_str"] = "only normal\n"
+        self.config["tests_str"] = "normal\n"
         self.config["vm_strs"] = {"vm1": "only CentOS\n", "vm2": "only Win10\n", "vm3": "only Ubuntu\n"}
 
         self.prefix = ""
