@@ -841,22 +841,22 @@ class TestGraph(object):
         object_variant = test_node.params.get("dep_id", ".*").replace(object_name + "-", "")
         node_name = test_node.params["shortname"]
 
-        all_vms = param.all_objects(key="vms")
-        def needed_vms():
+        def needed_objects(key="vms"):
+            all_objects = param.all_objects(key=key)
             # case of singleton test node
             if test_node.params.get("vms") is None:
                 if object_type != "nets":
                     if object_name:
                         # as the object depending on this node might not be a vm
                         # and thus a suffix, we have to obtain the relevant vm (suffix)
-                        vms = [object_name.split("_")[-1]]
+                        used_objects = [object_name.split("_")[-1]]
                     else:
                         vms = [test_node.params.get("main_vm", param.main_vm())]
                 else:
-                    vms = []
-                    for vm_name in all_vms:
+                    used_objects = []
+                    for vm_name in all_objects:
                         if re.search("(\.|^)" + vm_name + "(\.|$)", object_variant):
-                            vms += [vm_name]
+                            used_objects += [vm_name]
             else:
                 # case of leaf test node or even specified object (dependency) as well as node
                 vms = test_node.params["vms"].split(" ")
