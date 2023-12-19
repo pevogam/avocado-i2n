@@ -681,6 +681,7 @@ class TestNode(Runnable):
             should_scan = not self.is_finished(worker, 1)
             if should_scan:
                 should_run_from_scan = self.scan_states()
+                logging.debug(f"Should{' ' if should_run_from_scan else ' not '}run from scan {self}")
             # rerunning of test from previous jobs is never intended
             if len(self.shared_results) == 0 and not should_run_from_scan:
                 # TODO: this must be done on all bridged nodes the first time it happens
