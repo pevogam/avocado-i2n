@@ -508,6 +508,22 @@ class TestGraph(object):
         return TestGraph._unique_filter(test_objects) if unique else test_objects
 
     @staticmethod
+    def parse_flat_object(suffix: str, category: str, restriction: str = "",
+                          params: dict[str, str] = None) -> list[TestObject]:
+        """
+        Parse a flat object for each variant of a suffix satisfying a restriction.
+
+        :param suffix: suffix to expand into variant objects
+        :param category: category of the suffix that will determine the type of the objects
+        :param restriction: single or multi-line restriction to use
+        :param params: additional parameters to add to or overwrite all objects' parameters
+        :returns: a list of parsed flat test objects
+        """
+        flat_objects = TestGraph.parse_flat_objects(suffix, category, restriction, params)
+        assert len(flat_objects) == 1, f"Could not parse a unique {category} flat object {suffix} using {restriction}"
+        return flat_objects[0]
+
+    @staticmethod
     def parse_composite_objects(suffix: str, category: str, restriction: str = "",
                                 component_restrs: dict[str, str] = None,
                                 params: dict[str, str] = None,
