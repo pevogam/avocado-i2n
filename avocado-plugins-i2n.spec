@@ -29,7 +29,7 @@
 
 Summary: Avocado I2N Plugin
 Name: avocado-plugins-i2n
-Version: 98.0
+Version: 103.0
 Release: 0%{?gitrel}%{?dist}
 License: GPLv2
 Group: Development/Tools
