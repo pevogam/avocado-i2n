@@ -683,6 +683,9 @@ class TestNode(Runnable):
                 should_run_from_scan = self.scan_states()
             # rerunning of test from previous jobs is never intended
             if len(self.shared_results) == 0 and not should_run_from_scan:
+                # TODO: this must be done on all bridged nodes the first time it happens
+                # (while still 0 results) or it might be a problem of one container installing vms
+                # and failing, obtaining "failed" results where others will consider this beyond their scope
                 self.should_rerun = lambda _: False
 
             should_run = should_run_from_scan if should_scan else False
