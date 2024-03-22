@@ -1080,6 +1080,7 @@ class TestGraph(object):
                                                                                                   prefix + str(i+1), params, verbose)
             get_nodes += more_get_nodes
             parse_nodes += more_parse_nodes
+        assert len(set(get_nodes)) == len(get_nodes), get_nodes
         return get_nodes, parse_nodes
 
     def get_and_parse_nodes_from_composite_node_and_object(self, test_node: TestNode, test_object: TestObject,
@@ -1105,6 +1106,7 @@ class TestGraph(object):
         # handle nodes without dependency for the given object
         if not object_dependency:
             return [], []
+        assert object_params.get("get_state") is not None, object_params.get("get_state")
         unique_new_node = test_node.params.get_boolean("unique_nodes_from_full", object_params.get("get_state") != "0root")
         # reuse already satisfied dependency for nodes with only some parsed setup nodes
         # (useful for nodes that have multiple objects depending on the same already parsed parent node)
