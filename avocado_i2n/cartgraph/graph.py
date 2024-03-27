@@ -202,6 +202,14 @@ class TestGraph(object):
 
         :param str dump_dir: directory for the dump image
         :param str tag: tag of the dump, e.g. parsing/traversal step and slot
+
+        ..todo:: Update graph visualization:
+            - too many tests listed in progress and composite tests are increasing changing the percentage down
+                - progress jumps right to 95% with all flat tests finished right away
+                - perhaps consider only flat nodes but not with a simpler True and rather is_unrolled for percentage of workers or such
+            - graph dumps have to be updated
+                - perhaps visualize only flat nodes?
+                - neither this nor the above would support pre-parsed graph though unless we just list bridged nodes as single nodes (like before)
         """
         try:
             import graphviz
