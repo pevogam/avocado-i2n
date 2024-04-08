@@ -65,6 +65,7 @@ class RamfileBackend(SourcedStateBackend, VMStateBackend):
             f"Showing external states for vm {params['vms']} locally in {state_dir}"
         )
         vm_dir = os.path.join(state_dir, params["object_id"])
+        # TODO: there could be a race where we list a state that disappears in os.stat below
         snapshots = os.listdir(vm_dir)
 
         states = []
