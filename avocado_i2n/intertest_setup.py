@@ -296,15 +296,12 @@ def update(config: dict[str, Any], tag: str = "") -> None:
                     break
             else:
                 setup_str = "all.." + setup_str
+            setup_str = param.re_str(setup_str)
 
-            logging.info(
-                f"Flagging for removing by {worker.id} all old {vm_name} states "
-                f"depending on the updated '{to_state}'"
-            )
-            flag_state = "" if to_state == "install" else to_state
-            vm_objects = [
-                o for o in clean_graph.get_objects(param_val=vm_name) if o.key == "vms"
-            ]
+            """
+            clean_graph.flag_intersection(clean_graph, flag_type="run", flag=lambda self, slot: False)
+            clean_graph.flag_intersection(clean_graph, flag_type="clean", flag=lambda self, slot: False)
+            flag_state = None if to_state == "install" else to_state
             for vm_object in vm_objects:
                 try:
                     clean_graph.flag_children(
@@ -317,17 +314,18 @@ def update(config: dict[str, Any], tag: str = "") -> None:
                     )
                 except AssertionError as error:
                     logging.error(error)
-                    raise ValueError(
-                        f"Could not identify a test node from {vm_name}'s to_state='{flag_state}', "
-                        f"is it compatible with the default or specified remove set restriction?"
-                    )
+                    raise ValueError(f"Could not identify a test node from {vm_name}'s to_state='{flag_state}', "
+                                     f"is it compatible with the default or specified remove_set?")
+            """
 
             logging.info(
                 f"Flagging for updating by {worker.id} all {vm_name} states "
                 f"between and including '{from_state}' and '{to_state}'"
             )
-            if to_state == "install":
-                run_graph = l.parse_object_trees(
+            if to_state == "root":
+                run_graph = TestGraph()
+            elif to_state == "install":
+                install_graph = l.parse_object_trees(
                     worker=worker,
                     restriction=param.re_str("all..customize"),
                     prefix=tag,
@@ -335,10 +333,10 @@ def update(config: dict[str, Any], tag: str = "") -> None:
                     params=setup_dict,
                     verbose=False,
                 )
-                install_nodes = run_graph.get_nodes_by_name("all.original")
+                install_nodes = install_graph.get_nodes_by_name("all.original")
                 # produce a terminal node only run graph
                 run_graph = TestGraph()
-                run_graph.new_objects(clean_graph.objects)
+                run_graph.new_objects(install_graph.objects)
                 run_graph.new_nodes(install_nodes)
             else:
                 run_graph = l.parse_object_trees(
@@ -349,7 +347,8 @@ def update(config: dict[str, Any], tag: str = "") -> None:
                     params=setup_dict,
                     verbose=False,
                 )
-            clean_graph.flag_intersection(
+            # flagging children will require connected graphs while flagging intersection can also handle disconnected ones
+            run_graph.flag_intersection(
                 run_graph,
                 flag_type="run",
                 flag=lambda self, slot: not self.is_finished(slot)
@@ -370,9 +369,11 @@ def update(config: dict[str, Any], tag: str = "") -> None:
                     params=setup_dict,
                     verbose=False,
                 )
-                clean_graph.flag_intersection(
+                run_graph.flag_intersection(
                     skip_graph, flag_type="run", flag=lambda self, slot: False
                 )
+                """
+                # TODO: why is this run flagging needed again if we already flagged intersection with run graph?
                 for vm_object in vm_objects:
                     try:
                         clean_graph.flag_children(
@@ -386,13 +387,27 @@ def update(config: dict[str, Any], tag: str = "") -> None:
                         )
                     except AssertionError as error:
                         logging.error(error)
-                        raise ValueError(
-                            f"Could not identify a test node from {vm_name}'s from_state='{from_state}', "
-                            f"is it compatible with the default or specified remove set restriction?"
-                        )
+                        raise ValueError(f"Could not identify a test node from {vm_name}'s from_state='{from_state}', "
+                                         f"is it compatible with the default or specified remove_set?")
+                """
 
-        graph.new_objects([o for o in clean_graph.objects if o.key == "nets"])
-        graph.new_nodes(clean_graph.nodes)
+            graph.new_objects([o for o in run_graph.objects if o.key == "nets"])
+            graph.new_nodes(run_graph.nodes)
+
+        # TODO: unset root state?
+        state_dir = vm_params["swarm_pool"]
+        vm_dir = os.path.join(state_dir, vm_id)
+        qemu_img = QemuImg(params, vm_dir, image_name)
+        logging.debug(
+            "Showing external states for %s image %s locally in %s",
+            vm_name,
+            image_name,
+            state_dir,
+        )
+        image_dir = os.path.join(os.path.dirname(qemu_img.image_filename), image_name)
+        if not os.path.exists(image_dir):
+            return
+        snapshots = os.listdir(image_dir)
 
     logging.info(f"Bridging worker subgraphs across workers")
     for node1 in graph.nodes:
