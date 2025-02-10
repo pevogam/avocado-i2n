@@ -64,6 +64,9 @@ def off_state(fn: Callable[[Params, Env], None], do: str) -> Callable[[VirtTest,
         # all states are synced only via get
         if do in ["set", "unset"]:
             params["pool_scope"] = "own"
+            # TODO: same check_mode value is used for both get and set operations
+            if params.get("check_mode_images_image2"):
+                params["check_mode_images_image2"] = "rf"
         params["skip_types"] = "nets/vms"
         fn(params, env)
         del params["skip_types"]
