@@ -26,7 +26,7 @@ INTERFACE
 
 """
 
-import os
+import re
 from typing import Any
 from typing import Generator
 import logging as log
@@ -45,7 +45,6 @@ __all__ = [
     "BACKENDS",
     "ROOTS",
     "show_states",
-    "check_states",
     "get_states",
     "set_states",
     "unset_states",
@@ -143,7 +142,7 @@ class StateBackend:
 #: available state backend implementations
 BACKENDS = {}
 #: keywords reserved for root states
-ROOTS = ["root", "0root", "boot", "0boot"]
+ROOTS = ["root", "boot"]
 
 
 def _parametric_object_iteration(
@@ -196,14 +195,14 @@ def _state_check_chain(
     :param params_obj_name: name of the parametric object to check
     :param state_params: image parameters of the vm's image which is processed
     """
-    state_params["check_state"] = state_params[f"{do}_state"]
+    state_params["show_state"] = state_params[f"{do}_state"]
     if state_params.get(f"{do}_location"):
         state_params["show_location"] = state_params[f"{do}_location"]
     if do == "set":
-        state_params["check_opts"] = "soft_boot=yes"
+        state_params["show_opts"] = "soft_boot=yes"
         state_params["soft_boot"] = "yes"
     else:
-        state_params["check_opts"] = "soft_boot=no"
+        state_params["show_opts"] = "soft_boot=no"
         state_params["soft_boot"] = "no"
 
     # restrict inner call parameteric object types and names
@@ -212,7 +211,7 @@ def _state_check_chain(
     for composite_type, composite_name in zip(composite_types, composite_names):
         state_params[composite_type] = composite_name
     state_params["states_chain"] = composite_types[-1]
-    state_exists = check_states(state_params, env)
+    state_exists = len(show_states(state_params, env)) > 0
 
     return state_exists
 
@@ -240,6 +239,61 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
             )
             continue
 
+        # if the snapshot is not defined skip (leaf tests that are no setup)
+        if not state_params.get("show_state"):
+            logging.debug(
+                f"Skip showing {params_obj_type} states for {params_obj_name}"
+            )
+            continue
+        else:
+            state = "^" + state_params["show_state"] + "$"
+        # TODO: document after experimental period or rather refactor
+        state_params["show_mode"] = state_params.get("show_mode", "rf")
+        state_params["show_opts"] = state_params.get("show_opts", "soft_boot=yes")
+
+        state_backend = BACKENDS[state_params["states"]]
+        # TODO: we don't support other parametric object instances
+        vm = env.get_vm(state_params["vms"]) if env is not None else None
+        # TODO: consider whether we need this with more advanced env handling
+        # if vm is None and env is not None:
+        #    vm = env.create_vm(state_params.get('vm_type'), state_params.get('target'),
+        #                       params_obj_name, state_params, None)
+        state_object = env if params_obj_type == "nets" else vm
+
+        action_if_root_exists = state_params["show_mode"][0]
+        action_if_root_doesnt_exist = state_params["show_mode"][1]
+
+        # always check the corresponding root state as a prerequisite
+        root_exists = state_backend.check_root(state_params, state_object)
+        root_params = state_params.copy()
+        if not root_exists:
+            if action_if_root_doesnt_exist == "f":
+                root_params["pool_scope"] = "own"
+                state_backend.set_root(root_params, state_object)
+                root_exists = True
+            elif action_if_root_doesnt_exist == "r":
+                return []
+            else:
+                raise exceptions.TestError(
+                    f"Invalid policy {action_if_root_doesnt_exist}: The root "
+                    "nonexistence action can be either of 'reuse' or 'force'."
+                )
+        elif action_if_root_exists == "f":
+            root_params["pool_scope"] = "own"
+            # TODO: implement unset root for all parametric object types
+            if params_obj_type == "nets/vms":
+                vm.destroy(
+                    gracefully=root_params.get_dict("show_opts").get("soft_boot", "yes")
+                    == "yes"
+                )
+            else:
+                state_backend.unset_root(root_params, state_object)
+            state_backend.set_root(root_params, state_object)
+            root_exists = True
+        else:
+            state_backend.get_root(root_params, state_object)
+        states += ["root"] if root_exists else []
+
         logging.debug(
             "Checking %s for available %s states using %s",
             params_obj_name,
@@ -255,99 +309,10 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
             ", ".join(params_obj_states),
         )
         states += params_obj_states
+
+    # show only states that match the state show regex
+    states = [s for s in states if re.match(state, s)]
     return states
-
-
-def check_states(run_params: Params, env: Env = None) -> bool:
-    """
-    Check whether a given state exits.
-
-    :param run_params: configuration parameters
-    :returns: whether the given state exists
-
-    .. note:: We can check for multiple states of multiple objects at the
-        same time through our choice of configuration.
-    """
-    for state_params in _parametric_object_iteration(run_params):
-        params_obj_name = state_params["object_name"]
-        params_obj_type = state_params["object_type"]
-        if params_obj_type in state_params.objects("skip_types"):
-            continue
-        if params_obj_type == "nets/vms/images" and state_params.get_boolean(
-            "image_readonly", False
-        ):
-            logging.warning(
-                f"Incorrect configuration: cannot use any state "
-                f"from readonly image {params_obj_name} - skipping"
-            )
-            continue
-
-        # if the snapshot is not defined skip (leaf tests that are no setup)
-        if not state_params.get("check_state"):
-            logging.debug(
-                f"Skip checking any {params_obj_type} state for {params_obj_name}"
-            )
-            continue
-        else:
-            state = state_params["check_state"]
-        # NOTE: there is no concept of "check_mode" here
-        state_params["check_opts"] = state_params.get("check_opts", "soft_boot=yes")
-        # TODO: document after experimental period
-        state_params["check_mode"] = state_params.get("check_mode", "rf")
-
-        state_backend = BACKENDS[state_params["states"]]
-        # TODO: we don't support other parametric object instances
-        vm = env.get_vm(state_params["vms"]) if env is not None else None
-        # TODO: consider whether we need this with more advanced env handling
-        # if vm is None and env is not None:
-        #    vm = env.create_vm(state_params.get('vm_type'), state_params.get('target'),
-        #                       params_obj_name, state_params, None)
-        state_object = env if params_obj_type == "nets" else vm
-
-        action_if_root_exists = state_params["check_mode"][0]
-        action_if_root_doesnt_exist = state_params["check_mode"][1]
-
-        # always check the corresponding root state as a prerequisite
-        root_exists = state_backend.check_root(state_params, state_object)
-        root_params = state_params.copy()
-        if not root_exists:
-            if action_if_root_doesnt_exist == "f":
-                root_params["pool_scope"] = "own"
-                state_backend.set_root(root_params, state_object)
-                root_exists = True
-            elif action_if_root_doesnt_exist == "r":
-                return False
-            else:
-                raise exceptions.TestError(
-                    f"Invalid policy {action_if_root_doesnt_exist}: The root "
-                    "nonexistence action can be either of 'reuse' or 'force'."
-                )
-        elif action_if_root_exists == "f":
-            root_params["pool_scope"] = "own"
-            # TODO: implement unset root for all parametric object types
-            if params_obj_type == "nets/vms":
-                vm.destroy(
-                    gracefully=root_params.get_dict("check_opts").get(
-                        "soft_boot", "yes"
-                    )
-                    == "yes"
-                )
-            else:
-                state_backend.unset_root(root_params, state_object)
-            state_backend.set_root(root_params, state_object)
-            root_exists = True
-        else:
-            state_backend.get_root(root_params, state_object)
-
-        if state in ROOTS:
-            state_exists = root_exists
-        else:
-            state_exists = state in state_backend.show(state_params, state_object)
-
-        if not state_exists:
-            return False
-
-    return True
 
 
 def get_states(run_params: Params, env: Env = None) -> None:

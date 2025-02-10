@@ -1238,12 +1238,12 @@ class TestNode(Runnable):
 
             # ultimate consideration of whether the state is actually present
             object_suffix = f"_{test_object.key}_{test_object.long_suffix}"
-            node_params[f"check_state{object_suffix}"] = object_state
+            node_params[f"show_state{object_suffix}"] = object_state
             node_params[f"show_location{object_suffix}"] = (
                 ":" + object_params["shared_pool"]
             )
-            node_params[f"check_mode{object_suffix}"] = object_params.get(
-                "check_mode", "rf"
+            node_params[f"show_mode{object_suffix}"] = object_params.get(
+                "show_mode", "rf"
             )
             # TODO: unfortunately we need env object with pre-processed vms in order
             # to provide ad-hoc root vm states so we use the current advantage that
@@ -1258,7 +1258,7 @@ class TestNode(Runnable):
                 self.params["suite_path"], "controls", "pre_state.control"
             )
             mod_control_path = door.set_subcontrol_parameter(
-                control_path, "action", "check"
+                control_path, "action", "show"
             )
             mod_control_path = door.set_subcontrol_parameter_dict(
                 mod_control_path, "params", node_params
@@ -1470,7 +1470,7 @@ class TestNode(Runnable):
                 object_params = dependency_object.object_typed_params(self.params)
                 dependency_state = object_params["get_state"]
                 # cloned nodes don't have an explicit get_state parameter for the object
-                if dependency_state == "0root":
+                if dependency_state == "root":
                     continue
                 if object_state != dependency_state:
                     raise ValueError(
