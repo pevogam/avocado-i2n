@@ -84,7 +84,7 @@ __all__ = [
     "control",
     "upload",
     "shutdown",
-    "check",
+    "show",
     "pop",
     "push",
     "get",
@@ -617,14 +617,14 @@ def shutdown(config: dict[str, Any], tag: str = "") -> None:
 
 
 @with_cartesian_graph
-def check(config: dict[str, Any], tag: str = "") -> None:
+def show(config: dict[str, Any], tag: str = "") -> None:
     """
-    Check whether a given state (setup snapshot) exists.
+    Show all states (setup snapshots) of an object.
 
     :param config: command line arguments and run configuration
     :param tag: extra name identifier for the test to be run
     """
-    operation = "check"
+    operation = "show"
     _parse_and_iterate_for_objects_and_workers(
         config,
         tag,
@@ -770,7 +770,7 @@ def collect(config: dict[str, Any], tag: str = "") -> None:
     :param config: command line arguments and run configuration
     :param tag: extra name identifier for the test to be run
 
-    ..todo:: With later refactoring of the root check implicitly getting a
+    ..todo:: With later refactoring of the root show implicitly getting a
         pool rool state, we can refine the parameters here.
     """
     _reuse_tool_with_param_dict(
@@ -780,7 +780,7 @@ def collect(config: dict[str, Any], tag: str = "") -> None:
             "get_state_images": "root",
             "get_mode_images": "ii",
             # don't touch root states in any way
-            "check_mode_images": "rr",
+            "show_mode_images": "rr",
             # this manual tool is compatible only with pool
             "pool_scope": "swarm cluster shared",
         },
@@ -802,7 +802,7 @@ def create(config: dict[str, Any], tag: str = "") -> None:
             "set_state_images": "root",
             "set_mode_images": "af",
             # don't touch root states in any way
-            "check_mode_images": "rr",
+            "show_mode_images": "rr",
             # this manual tool is not compatible with pool
             "pool_scope": "own",
         },
@@ -824,7 +824,7 @@ def clean(config: dict[str, Any], tag: str = "") -> None:
             "unset_state_images": "root",
             "unset_mode_images": "fa",
             # make use of off switch if vm is running
-            "check_mode_images": "rf",
+            "show_mode_images": "rf",
             # this manual tool is not compatible with pool
             "pool_scope": "own",
         },
