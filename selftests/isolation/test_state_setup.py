@@ -1948,20 +1948,19 @@ class StatesSetupTest(Test):
         self.backend.show.assert_called_once()
         self.assertFalse(exists)
 
-    @mock.patch("avocado_i2n.states.setup.check_states")
+    @mock.patch("avocado_i2n.states.setup.show_states")
     def test_get(self, mock_show):
         """Test that state getting works with default policies."""
         self._set_up_generic_params("get", "state", "objects", "object1")
 
         # assert state retrieval is performed if state is available
         mock_show.reset()
-        mock_show.return_value = True
+        mock_show.return_value = ["state"]
         self.backend.reset_mock()
         ss.get_states(self.run_params, self.env)
         mock_show.assert_called_once()
         call_params = [call.args[0] for call in mock_show.call_args_list]
         self.assertEqual(len(call_params), 1)
-        self.assertEqual(call_params[0]["check_state"], "state")
         self.assertEqual(call_params[0]["show_location"], "/loc")
         self.assertEqual(call_params[0]["objects"], "object1")
         self.assertEqual(call_params[0]["object_name"], "object1")
@@ -1970,7 +1969,7 @@ class StatesSetupTest(Test):
 
         # assert state retrieval is aborted if state is not available
         mock_show.reset()
-        mock_show.return_value = False
+        mock_show.return_value = []
         self.backend.reset_mock()
         with self.assertRaises(exceptions.TestAbortError):
             ss.get_states(self.run_params, self.env)
@@ -1983,16 +1982,16 @@ class StatesSetupTest(Test):
 
         # assert state retrieval is aborted if state is available
         self.backend.reset_mock()
-        with mock.patch('avocado_i2n.states.setup.check_states',
-                        mock.MagicMock(return_value=True)):
+        with mock.patch('avocado_i2n.states.setup.show_states',
+                        mock.MagicMock(return_value=["state"])):
             with self.assertRaises(exceptions.TestAbortError):
                 ss.get_states(self.run_params, self.env)
             self.backend.get.assert_not_called()
 
         # assert state retrieval is aborted if state is not available
         self.backend.reset_mock()
-        with mock.patch('avocado_i2n.states.setup.check_states',
-                        mock.MagicMock(return_value=False)):
+        with mock.patch('avocado_i2n.states.setup.show_states',
+                        mock.MagicMock(return_value=[])):
             with self.assertRaises(exceptions.TestAbortError):
                 ss.get_states(self.run_params, self.env)
             self.backend.get.assert_not_called()
@@ -2004,8 +2003,8 @@ class StatesSetupTest(Test):
 
         # assert state retrieval is reused if available
         self.backend.reset_mock()
-        with mock.patch('avocado_i2n.states.setup.check_states',
-                        mock.MagicMock(return_value=True)):
+        with mock.patch('avocado_i2n.states.setup.show_states',
+                        mock.MagicMock(return_value=["state"])):
             ss.get_states(self.run_params, self.env)
             self.backend.get.assert_called_once()
 
@@ -2016,15 +2015,15 @@ class StatesSetupTest(Test):
 
         # assert state retrieval is ignored if state is available
         self.backend.reset_mock()
-        with mock.patch('avocado_i2n.states.setup.check_states',
-                        mock.MagicMock(return_value=True)):
+        with mock.patch('avocado_i2n.states.setup.show_states',
+                        mock.MagicMock(return_value=["state"])):
             ss.get_states(self.run_params, self.env)
             self.backend.get.assert_not_called()
 
         # assert state retrieval is ignored if state is not available
         self.backend.reset_mock()
-        with mock.patch('avocado_i2n.states.setup.check_states',
-                        mock.MagicMock(return_value=False)):
+        with mock.patch('avocado_i2n.states.setup.show_states',
+                        mock.MagicMock(return_value=[])):
             ss.get_states(self.run_params, self.env)
             self.backend.get.assert_not_called()
 
@@ -2035,16 +2034,16 @@ class StatesSetupTest(Test):
 
         # assert invalid policy x if state is available
         self.backend.reset_mock()
-        with mock.patch('avocado_i2n.states.setup.check_states',
-                        mock.MagicMock(return_value=True)):
+        with mock.patch('avocado_i2n.states.setup.show_states',
+                        mock.MagicMock(return_value=["state"])):
             with self.assertRaises(exceptions.TestError):
                 ss.get_states(self.run_params, self.env)
             self.backend.get.assert_not_called()
 
         # assert invalid policy x if state is not available
         self.backend.reset_mock()
-        with mock.patch('avocado_i2n.states.setup.check_states',
-                        mock.MagicMock(return_value=False)):
+        with mock.patch('avocado_i2n.states.setup.show_states',
+                        mock.MagicMock(return_value=[])):
             with self.assertRaises(exceptions.TestError):
                 ss.get_states(self.run_params, self.env)
             self.backend.get.assert_not_called()
