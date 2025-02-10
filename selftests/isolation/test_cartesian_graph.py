@@ -1736,18 +1736,18 @@ class CartesianNodeTest(Test):
         with self.assertRaises(RuntimeError):
             test_node2.default_run_decision(worker1)
         # should run an internal test node without available setup
-        DummyStateControl.asserted_states["check"] = {"install": {self.shared_pool: False}}
+        DummyStateControl.asserted_states["show"] = {"install": {self.shared_pool: False}}
         test_node1.params["nets_host"], test_node1.params["nets_gateway"] = "1", ""
         self.assertTrue(test_node1.default_run_decision(worker1))
         # should not run an internal test node with available setup
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
         self.assertFalse(test_node1.default_run_decision(worker1))
         # should not run already visited internal test node by the same worker
         test_node1.finished_worker = worker1
         test_node1.results += [{"name": "install.net1", "status": "PASS"}]
         self.assertFalse(test_node1.default_run_decision(worker1))
         # should not run an internal test node if needed reruns and setup from past runs
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
         test_node1.should_rerun = lambda _: True
         test_node1.finished_worker = None
         test_node1.results = []
@@ -2130,15 +2130,19 @@ class CartesianGraphTest(Test):
 
         DummyTestRun.asserted_tests = []
         self.shared_pool = ":" + self.config["param_dict"]["shared_pool"]
-        DummyStateControl.asserted_states = {"check": {}, "get": {}, "set": {}, "unset": {}}
-        DummyStateControl.asserted_states["check"] = {"install": {self.shared_pool: False},
-                                                      "customize": {self.shared_pool: False}, "on_customize": {self.shared_pool: False},
-                                                      "connect": {self.shared_pool: False},
-                                                      "linux_virtuser": {self.shared_pool: False}, "windows_virtuser": {self.shared_pool: False}}
-        DummyStateControl.asserted_states["get"] = {"install": {self.shared_pool: 0},
-                                                    "customize": {self.shared_pool: 0}, "on_customize": {self.shared_pool: 0},
-                                                    "connect": {self.shared_pool: 0},
-                                                    "linux_virtuser": {self.shared_pool: 0}, "windows_virtuser": {self.shared_pool: 0}}
+        DummyStateControl.asserted_states = {"show": {}, "get": {}, "set": {}, "unset": {}}
+        DummyStateControl.asserted_states["show"] = {
+            "install": {self.shared_pool: False},
+            "customize": {self.shared_pool: False}, "on_customize": {self.shared_pool: False},
+            "connect": {self.shared_pool: False},
+            "linux_virtuser": {self.shared_pool: False}, "windows_virtuser": {self.shared_pool: False}
+        }
+        DummyStateControl.asserted_states["get"] = {
+            "install": {self.shared_pool: 0},
+            "customize": {self.shared_pool: 0}, "on_customize": {self.shared_pool: 0},
+            "connect": {self.shared_pool: 0},
+            "linux_virtuser": {self.shared_pool: 0}, "windows_virtuser": {self.shared_pool: 0}
+        }
 
     def _load_for_parsing(self, restriction, params):
         graph = TestGraph()
@@ -2814,7 +2818,7 @@ class CartesianGraphTest(Test):
         graph = self._load_for_parsing("normal..tutorial1",
                                        {"nets": " ".join([f"net{i+1}" for i in range(3)])})
 
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
         DummyTestRun.asserted_tests = [
             # cleanup is expected only if at least one of the states is reusable (here root+install)
             {"shortname": "^internal.automated.customize.vm1", "vms": "^vm1$", "nets_spawner": "lxc", "nets": "^net1$"},
@@ -2829,7 +2833,7 @@ class CartesianGraphTest(Test):
         graph = self._load_for_parsing("normal..tutorial1",
                                        {"nets": " ".join([f"net{i+1}" for i in range(3)])})
 
-        DummyStateControl.asserted_states["check"]["customize"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["customize"][self.shared_pool] = True
         DummyTestRun.asserted_tests = [
             {"shortname": "^internal.stateless.noop.vm1", "vms": "^vm1$", "nets": "^net1$"},
             {"shortname": "^original.unattended_install.cdrom.extra_cdrom_ks.default_install.aio_threads.vm1", "vms": "^vm1$", "nets": "^net1$"},
@@ -2844,7 +2848,7 @@ class CartesianGraphTest(Test):
         graph = self._load_for_parsing("normal..tutorial1",
                                        {"nets": " ".join([f"net{i+1}" for i in range(2)])})
 
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
         DummyTestRun.asserted_tests = [
             {"shortname": "^internal.automated.customize.vm1", "vms": "^vm1$", "nets": "^net1$", "_status": "FAIL"},
             {"shortname": "^internal.automated.on_customize.vm1", "vms": "^vm1$", "nets": "^net1$"},
@@ -2891,7 +2895,7 @@ class CartesianGraphTest(Test):
         test_node = graph.get_nodes(param_val="tutorial2.+net4", unique=True)
         test_node.started_worker = graph.workers["net4"]
         del graph.workers["net4"]
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
         DummyTestRun.asserted_tests = [
             {"shortname": "^internal.automated.customize.vm1", "vms": "^vm1$", "nets": "^net1$"},
             {"shortname": "^internal.automated.on_customize.vm1", "vms": "^vm1$", "nets": "^net1$"},
@@ -2906,8 +2910,8 @@ class CartesianGraphTest(Test):
         graph = self._load_for_parsing("normal..tutorial3",
                                        {"nets": " ".join([f"net{i+1}" for i in range(4)])})
 
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = False
-        DummyStateControl.asserted_states["check"]["customize"][self.shared_pool] = False
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = False
+        DummyStateControl.asserted_states["show"]["customize"][self.shared_pool] = False
         DummyTestRun.asserted_tests = [
             {"shortname": "^internal.stateless.noop.vm1", "vms": "^vm1$", "nets": "^net1$"},
             {"shortname": "^internal.stateless.noop.vm2", "vms": "^vm2$", "nets": "^net2$"},
@@ -2934,8 +2938,8 @@ class CartesianGraphTest(Test):
         graph = self._load_for_parsing("normal..tutorial3",
                                        {"nets": " ".join([f"net{i+1}" for i in range(4)])})
 
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"]["customize"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["customize"][self.shared_pool] = True
         DummyTestRun.asserted_tests = [
             {"shortname": "^internal.automated.connect.vm1", "vms": "^vm1$", "nets": "^net1$"},
             {"shortname": "^normal.nongui.tutorial3", "vms": "^vm1 vm2$", "nets": "^net1$"},
@@ -2953,10 +2957,10 @@ class CartesianGraphTest(Test):
         graph = self._load_for_parsing("leaves..tutorial_gui",
                                        {"nets": " ".join([f"net{i+1}" for i in range(4)])})
 
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"]["customize"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"]["guisetup.noop"] = {self.shared_pool: False}
-        DummyStateControl.asserted_states["check"]["guisetup.clicked"] = {self.shared_pool: False}
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["customize"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["guisetup.noop"] = {self.shared_pool: False}
+        DummyStateControl.asserted_states["show"]["guisetup.clicked"] = {self.shared_pool: False}
         DummyStateControl.asserted_states["get"]["guisetup.noop"] = {self.shared_pool: 0}
         DummyStateControl.asserted_states["get"]["guisetup.clicked"] = {self.shared_pool: 0}
         DummyStateControl.asserted_states["unset"] = {"guisetup.noop": {self.shared_pool: 0}}
@@ -2989,10 +2993,10 @@ class CartesianGraphTest(Test):
         graph = self._load_for_parsing("leaves..client_clicked,leaves..explicit_clicked",
                                        {"nets": " ".join([f"net{i+1}" for i in range(2)])})
 
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"]["customize"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"]["guisetup.clicked"] = {self.shared_pool: False}
-        DummyStateControl.asserted_states["check"]["getsetup.clicked"] = {self.shared_pool: False}
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["customize"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["guisetup.clicked"] = {self.shared_pool: False}
+        DummyStateControl.asserted_states["show"]["getsetup.clicked"] = {self.shared_pool: False}
         DummyStateControl.asserted_states["get"]["guisetup.clicked"] = {self.shared_pool: 0}
         DummyStateControl.asserted_states["get"]["getsetup.clicked"] = {self.shared_pool: 0}
         DummyStateControl.asserted_states["unset"] = {"guisetup.clicked": {self.shared_pool: 0}}
@@ -3036,18 +3040,24 @@ class CartesianGraphTest(Test):
         graph.traverse_node.side_effect = delayed_traverse_wrapper
         graph.reverse_node.side_effect = reverse_wrapper
 
-        DummyStateControl.asserted_states["check"].update({"getsetup": {self.shared_pool: False},
-                                                           "guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.guisetup.noop": {self.shared_pool: False},
-                                                           "getsetup.guisetup.clicked": {self.shared_pool: False}})
-        DummyStateControl.asserted_states["get"].update({"getsetup": {self.shared_pool: 0},
-                                                         "guisetup.noop": {self.shared_pool: 0}, "guisetup.clicked": {self.shared_pool: 0},
-                                                         "getsetup.noop": {self.shared_pool: 0}, "getsetup.clicked": {self.shared_pool: 0},
-                                                         "getsetup.guisetup.noop": {self.shared_pool: 0},
-                                                         "getsetup.guisetup.clicked": {self.shared_pool: 0}})
-        DummyStateControl.asserted_states["unset"] = {"guisetup.noop": {self.shared_pool: 0},
-                                                      "getsetup.noop": {self.shared_pool: 0}}
+        DummyStateControl.asserted_states["show"].update({
+            "getsetup": {self.shared_pool: False},
+            "guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
+            "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
+            "getsetup.guisetup.noop": {self.shared_pool: False},
+            "getsetup.guisetup.clicked": {self.shared_pool: False}
+        })
+        DummyStateControl.asserted_states["get"].update({
+            "getsetup": {self.shared_pool: 0},
+            "guisetup.noop": {self.shared_pool: 0}, "guisetup.clicked": {self.shared_pool: 0},
+            "getsetup.noop": {self.shared_pool: 0}, "getsetup.clicked": {self.shared_pool: 0},
+            "getsetup.guisetup.noop": {self.shared_pool: 0},
+            "getsetup.guisetup.clicked": {self.shared_pool: 0}
+        })
+        DummyStateControl.asserted_states["unset"] = {
+            "guisetup.noop": {self.shared_pool: 0},
+            "getsetup.noop": {self.shared_pool: 0}
+        }
         DummyTestRun.asserted_tests = [
         ]
 
@@ -3094,10 +3104,12 @@ class CartesianGraphTest(Test):
         graph.traverse_node.side_effect = interrupted_wrapper
         graph.reverse_node = mock.MagicMock()
         graph.reverse_node.side_effect = interrupted_wrapper
-        DummyStateControl.asserted_states["check"].update({"guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.guisetup.noop": {self.shared_pool: False},
-                                                           "getsetup.guisetup.clicked": {self.shared_pool: False}})
+        DummyStateControl.asserted_states["show"].update({
+            "guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
+            "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
+            "getsetup.guisetup.noop": {self.shared_pool: False},
+            "getsetup.guisetup.clicked": {self.shared_pool: False}
+        })
         DummyTestRun.asserted_tests = [
         ]
         self._run_traversal(graph, params=self.config["param_dict"])
@@ -3322,8 +3334,10 @@ class CartesianGraphTest(Test):
             "", self.config["vm_strs"],
             self.config["param_dict"],
         )
-        DummyStateControl.asserted_states["check"] = {"root": {self.shared_pool: True}, "install": {self.shared_pool: True},
-                                                      "customize": {self.shared_pool: True}, "on_customize": {self.shared_pool: True}}
+        DummyStateControl.asserted_states["show"] = {
+            "root": {self.shared_pool: True}, "install": {self.shared_pool: True},
+            "customize": {self.shared_pool: True}, "on_customize": {self.shared_pool: True}
+        }
         DummyTestRun.asserted_tests = [
             {"shortname": r"^normal.nongui.quicktest.tutorial1.vm1", "vms": r"^vm1$", "nets": "^net1$"},
             {"shortname": r"^normal.nongui.quicktest.tutorial1.vm1", "vms": r"^vm1$", "_long_prefix": r"^[a\d]+r1-vm1$", "nets": "^net2$"},
@@ -3346,8 +3360,10 @@ class CartesianGraphTest(Test):
                     self.prefix, self.config["vm_strs"],
                     self.config["param_dict"],
                 )
-                DummyStateControl.asserted_states["check"] = {"root": {self.shared_pool: True}, "install": {self.shared_pool: True},
-                                                              "customize": {self.shared_pool: True}, "on_customize": {self.shared_pool: True}}
+                DummyStateControl.asserted_states["show"] = {
+                    "root": {self.shared_pool: True}, "install": {self.shared_pool: True},
+                    "customize": {self.shared_pool: True}, "on_customize": {self.shared_pool: True}
+                }
                 DummyTestRun.asserted_tests = [
                     {"shortname": "^normal.nongui.quicktest.tutorial1.vm1", "vms": "^vm1$", "_status" : status},
                     {"shortname": "^normal.nongui.quicktest.tutorial1.vm1", "vms": "^vm1$", "_status" : status},
@@ -3385,8 +3401,10 @@ class CartesianGraphTest(Test):
                     self.prefix, self.config["vm_strs"],
                     self.config["param_dict"],
                 )
-                DummyStateControl.asserted_states["check"] = {"root": {self.shared_pool: True}, "install": {self.shared_pool: True},
-                                                              "customize": {self.shared_pool: True}, "on_customize": {self.shared_pool: True}}
+                DummyStateControl.asserted_states["show"] = {
+                    "root": {self.shared_pool: True}, "install": {self.shared_pool: True},
+                    "customize": {self.shared_pool: True}, "on_customize": {self.shared_pool: True}
+                }
                 DummyTestRun.asserted_tests = [
                     {"shortname": "^normal.nongui.quicktest.tutorial1.vm1", "vms": "^vm1$", "_status" : status},
                 ]
@@ -3421,8 +3439,10 @@ class CartesianGraphTest(Test):
                     self.prefix, self.config["vm_strs"],
                     self.config["param_dict"],
                 )
-                DummyStateControl.asserted_states["check"] = {"root": {self.shared_pool: True}, "install": {self.shared_pool: True},
-                                                              "customize": {self.shared_pool: True}, "on_customize": {self.shared_pool: True}}
+                DummyStateControl.asserted_states["show"] = {
+                    "root": {self.shared_pool: True}, "install": {self.shared_pool: True},
+                    "customize": {self.shared_pool: True}, "on_customize": {self.shared_pool: True}
+                }
                 DummyTestRun.asserted_tests = [
                     {"shortname": "^normal.nongui.quicktest.tutorial1.vm1", "vms": "^vm1$", "_status" : status},
                     {"shortname": "^normal.nongui.quicktest.tutorial1.vm1", "vms": "^vm1$", "_status" : "INTERRUPTED"},
@@ -3469,8 +3489,10 @@ class CartesianGraphTest(Test):
         graph.new_nodes(TestGraph.parse_flat_nodes("leaves..tutorial2"))
         graph.parse_shared_root_from_object_roots()
         graph.new_workers(TestGraph.parse_workers({"nets": "net1", "only_vm1": ""}))
-        DummyStateControl.asserted_states["check"] = {"root": {self.shared_pool: True}, "install": {self.shared_pool: True},
-                                                      "customize": {self.shared_pool: True}, "on_customize": {self.shared_pool: True}}
+        DummyStateControl.asserted_states["show"] = {
+            "root": {self.shared_pool: True}, "install": {self.shared_pool: True},
+            "customize": {self.shared_pool: True}, "on_customize": {self.shared_pool: True}
+        }
         DummyTestRun.asserted_tests = [
             # skip the previously passed test since it doesn't have a rerun status (here fail by default) and rerun second test
             {"shortname": "^leaves.quicktest.tutorial2.names.vm1.+CentOS", "vms": "^vm1$"},
@@ -3519,8 +3541,10 @@ class CartesianGraphTest(Test):
         graph.new_nodes(TestGraph.parse_flat_nodes("leaves..tutorial2"))
         graph.parse_shared_root_from_object_roots()
         graph.new_workers(TestGraph.parse_workers({"nets": "net1", "only_vm1": "CentOS"}))
-        DummyStateControl.asserted_states["check"] = {"root": {self.shared_pool: True}, "install": {self.shared_pool: True},
-                                                      "customize": {self.shared_pool: True}, "on_customize": {self.shared_pool: True}}
+        DummyStateControl.asserted_states["show"] = {
+            "root": {self.shared_pool: True}, "install": {self.shared_pool: True},
+            "customize": {self.shared_pool: True}, "on_customize": {self.shared_pool: True}
+        }
         DummyTestRun.asserted_tests = [
             # previously run setup tests with rerun status are still rerun (scan is overriden)
             {"shortname": "^internal.automated.on_customize.vm1", "vms": "^vm1$", "get_state_images": "^customize$", "set_state_vms": "^on_customize$"},
@@ -3547,8 +3571,10 @@ class CartesianGraphTest(Test):
     def test_rerun_invalid(self):
         """Test if an exception is thrown with invalid retry parameter values."""
         self.config["tests_str"] += "only tutorial1\n"
-        DummyStateControl.asserted_states["check"] = {"root": {self.shared_pool: True}, "install": {self.shared_pool: True},
-                                                      "customize": {self.shared_pool: True}, "on_customize": {self.shared_pool: True}}
+        DummyStateControl.asserted_states["show"] = {
+            "root": {self.shared_pool: True}, "install": {self.shared_pool: True},
+            "customize": {self.shared_pool: True}, "on_customize": {self.shared_pool: True}
+        }
 
         DummyTestRun.asserted_tests = [
                     {"shortname": "^normal.nongui.quicktest.tutorial1.vm1", "vms": "^vm1$"},
@@ -3610,10 +3636,12 @@ class CartesianGraphTest(Test):
         # TODO: cannot parse "all" with flat nodes with largest available test set being "leaves"
         graph = self._load_for_parsing("leaves", {"nets": " ".join([f"net{i+1}" for i in range(3)])})
 
-        DummyStateControl.asserted_states["check"].update({"guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.guisetup.noop": {self.shared_pool: False},
-                                                           "getsetup.guisetup.clicked": {self.shared_pool: False}})
+        DummyStateControl.asserted_states["show"].update({
+            "guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
+            "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
+            "getsetup.guisetup.noop": {self.shared_pool: False},
+            "getsetup.guisetup.clicked": {self.shared_pool: False}
+        })
         DummyTestRun.asserted_tests = [
         ]
 
@@ -3626,7 +3654,7 @@ class CartesianGraphTest(Test):
         """Test that traversal is aborted through explicit configuration."""
         graph = self._load_for_parsing("tutorial1", {"nets": " ".join([f"net{i+1}" for i in range(3)])})
 
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
         DummyTestRun.asserted_tests = [
             {"shortname": "^internal.automated.customize.vm1", "vms": "^vm1$"},
             {"shortname": "^internal.automated.on_customize.vm1", "vms": "^vm1$", "set_state_vms_on_error": "^$", "_status": "FAIL"},
@@ -3654,10 +3682,12 @@ class CartesianGraphTest(Test):
         graph.reverse_node = mock.MagicMock()
         graph.reverse_node.side_effect = interrupted_wrapper
 
-        DummyStateControl.asserted_states["check"].update({"guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.guisetup.noop": {self.shared_pool: False},
-                                                           "getsetup.guisetup.clicked": {self.shared_pool: False}})
+        DummyStateControl.asserted_states["show"].update({
+            "guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
+            "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
+            "getsetup.guisetup.noop": {self.shared_pool: False},
+            "getsetup.guisetup.clicked": {self.shared_pool: False}
+        })
         DummyTestRun.asserted_tests = [
         ]
 
@@ -3704,10 +3734,12 @@ class CartesianGraphTest(Test):
         graph.reverse_node = mock.MagicMock()
         graph.reverse_node.side_effect = actual_reversing
 
-        DummyStateControl.asserted_states["check"].update({"guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.guisetup.noop": {self.shared_pool: False},
-                                                           "getsetup.guisetup.clicked": {self.shared_pool: False}})
+        DummyStateControl.asserted_states["show"].update({
+            "guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
+            "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
+            "getsetup.guisetup.noop": {self.shared_pool: False},
+            "getsetup.guisetup.clicked": {self.shared_pool: False}
+        })
         DummyTestRun.asserted_tests = [
         ]
 
@@ -3799,8 +3831,8 @@ class CartesianGraphTest(Test):
                                        {"nets": " ".join([f"net{i+1}" for i in range(4)]),
                                         "shared_pool": self.config["param_dict"]["shared_pool"]})
 
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"]["customize"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["customize"][self.shared_pool] = True
         DummyTestRun.asserted_tests = [
             {"shortname": "^internal.automated.on_customize.vm1", "vms": "^vm1$", "nets": "^net1$",
              "get_location_image1_vm1": ":/mnt/local/images/shared"},
@@ -3849,10 +3881,10 @@ class CartesianGraphTest(Test):
         self.assertEqual(workers[3].params["nets_shell_port"], "22")
 
         # this is not what we test but simply a means to remove some initial nodes for simpler testing
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"]["customize"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"]["guisetup.noop"] = {self.shared_pool: False}
-        DummyStateControl.asserted_states["check"]["guisetup.clicked"] = {self.shared_pool: False}
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["customize"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["guisetup.noop"] = {self.shared_pool: False}
+        DummyStateControl.asserted_states["show"]["guisetup.clicked"] = {self.shared_pool: False}
         DummyStateControl.asserted_states["get"]["guisetup.noop"] = {self.shared_pool: 0}
         DummyStateControl.asserted_states["get"]["guisetup.clicked"] = {self.shared_pool: 0}
         DummyStateControl.asserted_states["unset"] = {"guisetup.noop": {self.shared_pool: 0}}
@@ -3921,10 +3953,10 @@ class CartesianGraphTest(Test):
         self.assertEqual(workers[3].params["nets_shell_port"], "222")
 
         # this is not what we test but simply a means to remove some initial nodes for simpler testing
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"]["customize"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"]["guisetup.noop"] = {self.shared_pool: False}
-        DummyStateControl.asserted_states["check"]["guisetup.clicked"] = {self.shared_pool: False}
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["customize"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["guisetup.noop"] = {self.shared_pool: False}
+        DummyStateControl.asserted_states["show"]["guisetup.clicked"] = {self.shared_pool: False}
         DummyStateControl.asserted_states["get"]["guisetup.noop"] = {self.shared_pool: 0}
         DummyStateControl.asserted_states["get"]["guisetup.clicked"] = {self.shared_pool: 0}
         DummyStateControl.asserted_states["unset"] = {"guisetup.noop": {self.shared_pool: 0}}
@@ -3973,10 +4005,10 @@ class CartesianGraphTest(Test):
             self.config["param_dict"],
         )
         # this is not what we test but simply a means to remove some initial nodes for simpler testing
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"]["customize"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"]["guisetup.noop"] = {self.shared_pool: False}
-        DummyStateControl.asserted_states["check"]["guisetup.clicked"] = {self.shared_pool: False}
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["customize"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["guisetup.noop"] = {self.shared_pool: False}
+        DummyStateControl.asserted_states["show"]["guisetup.clicked"] = {self.shared_pool: False}
         DummyStateControl.asserted_states["get"]["guisetup.noop"] = {self.shared_pool: 0}
         DummyStateControl.asserted_states["get"]["guisetup.clicked"] = {self.shared_pool: 0}
         DummyStateControl.asserted_states["unset"] = {"guisetup.noop": {self.shared_pool: 0}}
@@ -4013,11 +4045,13 @@ class CartesianGraphTest(Test):
         """Test a complete test run including complex setup that involves permanent vms and cloning."""
         graph = self._load_for_parsing("leaves..tutorial_get", {"nets": "net1"})
 
-        DummyStateControl.asserted_states["check"]["root"] = {self.shared_pool: True}
-        DummyStateControl.asserted_states["check"].update({"guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.guisetup.noop": {self.shared_pool: False},
-                                                           "getsetup.guisetup.clicked": {self.shared_pool: False}})
+        DummyStateControl.asserted_states["show"]["root"] = {self.shared_pool: True}
+        DummyStateControl.asserted_states["show"].update({
+            "guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
+            "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
+            "getsetup.guisetup.noop": {self.shared_pool: False},
+            "getsetup.guisetup.clicked": {self.shared_pool: False}
+        })
         # test syncing also for permanent vms
         DummyStateControl.asserted_states["get"]["ready"] = {self.shared_pool: 0}
         # TODO: currently not used due to excluded self-sync but one that is not the correct implementation
@@ -4070,13 +4104,15 @@ class CartesianGraphTest(Test):
         self.job.config["vm_strs"] = {"vm1": "", "vm2": "", "vm3": "only Ubuntu\n"}
         graph = self._load_for_parsing("leaves..tutorial_get,leaves..tutorial_gui", {"nets": "net1"})
 
-        DummyStateControl.asserted_states["check"]["root"] = {self.shared_pool: True}
-        DummyStateControl.asserted_states["check"].update({"guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.guisetup.noop": {self.shared_pool: False},
-                                                           "getsetup.guisetup.clicked": {self.shared_pool: False}})
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"]["customize"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["root"] = {self.shared_pool: True}
+        DummyStateControl.asserted_states["show"].update({
+            "guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
+            "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
+            "getsetup.guisetup.noop": {self.shared_pool: False},
+            "getsetup.guisetup.clicked": {self.shared_pool: False}
+        })
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["customize"][self.shared_pool] = True
         # test syncing also for permanent vms
         DummyStateControl.asserted_states["get"]["ready"] = {self.shared_pool: 0}
         # TODO: currently not used due to excluded self-sync but one that is not the correct implementation
@@ -4152,11 +4188,13 @@ class CartesianGraphTest(Test):
         """Test for correct deep cloning."""
         graph = self._load_for_parsing("leaves..tutorial_finale", {"nets": "net1"})
 
-        DummyStateControl.asserted_states["check"]["install"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"]["customize"][self.shared_pool] = True
-        DummyStateControl.asserted_states["check"].update({"guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
-                                                           "getsetup.guisetup.noop": {self.shared_pool: False},
-                                                           "getsetup.guisetup.clicked": {self.shared_pool: False}})
+        DummyStateControl.asserted_states["show"]["install"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"]["customize"][self.shared_pool] = True
+        DummyStateControl.asserted_states["show"].update({
+            "guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
+            "getsetup.guisetup.noop": {self.shared_pool: False},
+            "getsetup.guisetup.clicked": {self.shared_pool: False}
+        })
         # TODO: currently not used due to excluded self-sync but one that is not the correct implementation
         DummyStateControl.asserted_states["get"].update({"guisetup.noop": {self.shared_pool: 0}, "guisetup.clicked": {self.shared_pool: 0},
                                                          "getsetup.guisetup.noop": {self.shared_pool: 0},

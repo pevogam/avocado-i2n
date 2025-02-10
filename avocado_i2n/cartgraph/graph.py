@@ -1372,7 +1372,7 @@ class TestGraph(object):
         )
 
         unique_new_node = test_node.params.get_boolean(
-            "unique_nodes_from_full", object_params.get("get_state") != "0root"
+            "unique_nodes_from_full", object_params.get("get_state") != "root"
         )
         # reuse already satisfied dependency for nodes with only some parsed setup nodes
         # (useful for nodes that have multiple objects depending on the same already parsed parent node)
@@ -1935,7 +1935,7 @@ class TestGraph(object):
         setup_dict.update(
             {
                 "type": "shared_configure_install",
-                "check_mode": "rr",  # explicit root handling
+                "show_mode": "rr",  # explicit root handling
                 # overwrite some params inherited from the modified install node
                 f"set_state_images_{object_image}_{object_vm}": "root",
                 "start_vm": "no",
