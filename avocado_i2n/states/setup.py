@@ -196,7 +196,7 @@ def _state_check_chain(
     :param params_obj_name: name of the parametric object to check
     :param state_params: image parameters of the vm's image which is processed
     """
-    state_params["check_state"] = state_params[f"{do}_state"]
+    state = state_params[f"{do}_state"]
     if state_params.get(f"{do}_location"):
         state_params["show_location"] = state_params[f"{do}_location"]
     if do == "set":
@@ -214,7 +214,7 @@ def _state_check_chain(
     for composite_type, composite_name in zip(composite_types, composite_names):
         state_params[composite_type] = composite_name
     state_params["states_chain"] = composite_types[-1]
-    state_exists = check_states(state_params, env)
+    state_exists = state in show_states(state_params, env)
 
     return state_exists
 
