@@ -88,9 +88,9 @@ def run(test, params, env):
             vm.destroy(gracefully=True)
 
     # state manipulation
-    elif params.get("vm_action", "run") == "check":
-        log.info(f"Checking {params['main_vm']}'s (and its images') states")
-        ss.check_states(params, env)
+    elif params.get("vm_action", "run") == "show":
+        log.info(f"Showing {params['main_vm']}'s (and its images') states")
+        ss.show_states(params, env)
     elif params.get("vm_action", "run") == "push":
         log.info(f"Pushing {params['main_vm']}'s (and its images') states")
         ss.push_states(params, env)

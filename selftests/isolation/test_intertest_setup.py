@@ -344,7 +344,7 @@ class IntertestSetupTest(Test):
         """Test the general usage of all state manipulation tools."""
         self.config["param_dict"]["nets"] = "net1 net5"
         self.config["vm_strs"] = {"vm2": "only Win7\n", "vm3": ""}
-        for state_action in ["check", "pop", "push", "get", "set", "unset"]:
+        for state_action in ["show", "pop", "push", "get", "set", "unset"]:
             with self.subTest(f"Manual state {state_action}"):
                 DummyStateControl.asserted_states["get"] = {"root": {self.shared_pool: 0}}
                 DummyTestRun.asserted_tests = [
@@ -404,7 +404,7 @@ class IntertestSetupTest(Test):
     def test_permanent_vm_tool(self):
         """Test the general usage of the sample custom permanent vm creation tool."""
         self.config["vm_strs"] = {"vm3": "only Ubuntu\n"}
-        DummyStateControl.asserted_states["check"] = {"ready": {self.shared_pool: 0}}
+        DummyStateControl.asserted_states["show"] = {"ready": {self.shared_pool: 0}}
         DummyStateControl.asserted_states["unset"] = {"on_customize": {self.shared_pool: 0}}
         DummyTestRun.asserted_tests = [
             {"shortname": "^internal.stateless.noop.vm3", "vms": "^vm3$", "type": "^shared_configure_install$"},

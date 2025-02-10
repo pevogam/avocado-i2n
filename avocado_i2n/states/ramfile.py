@@ -66,9 +66,9 @@ class RamfileBackend(SourcedStateBackend):
             image_params["images"] = image_name
             image_snapshots = cls.image_state_backend.show(image_params, object=object)
             if len(images_states) == 0:
-                images_states = image_snapshots
+                images_states = set(image_snapshots)
             else:
-                images_states = images_states.intersect(image_snapshots)
+                images_states = images_states.intersection(image_snapshots)
 
         states = []
         for snapshot in snapshots:
