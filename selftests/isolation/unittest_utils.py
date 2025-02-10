@@ -70,9 +70,9 @@ class DummyTestRun(object):
 
 class DummyStateControl(object):
 
-    asserted_states = {"check": {}, "get": {}, "set": {}, "unset": {}}
+    asserted_states = {"show": {}, "get": {}, "set": {}, "unset": {}}
     states_params = {}
-    action = "check"
+    action = "show"
 
     def __init__(self):
         params = self.states_params
@@ -83,12 +83,11 @@ class DummyStateControl(object):
             vm_params = params.object_params(vm)
             for image in params.objects("images"):
                 image_params = vm_params.object_params(image)
-                do_loc = "show" if do == "check" else do
-                do_source = image_params.get(f"{do_loc}_location_images", "")
+                do_source = image_params.get(f"{do}_location_images", "")
                 do_state = image_params.get(f"{do}_state_images")
                 if not do_state:
                     do_state = image_params.get(f"{do}_state_vms")
-                    do_source = image_params.get(f"{do_loc}_location_vms", "")
+                    do_source = image_params.get(f"{do}_location_vms", "")
                     if not do_state:
                         continue
 
@@ -99,7 +98,7 @@ class DummyStateControl(object):
                     # TODO: currently we cannot fully test additional state sources
                     if not do_source.endswith("shared"):
                         continue
-                    if do == "check":
+                    if do == "show":
                         if not self.asserted_states[do][do_state][do_source] and len(do_sources) == 1:
                             self.result = False
                     else:
