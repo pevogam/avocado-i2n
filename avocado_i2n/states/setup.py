@@ -196,7 +196,7 @@ def _state_check_chain(
     :param params_obj_name: name of the parametric object to check
     :param state_params: image parameters of the vm's image which is processed
     """
-    state_params["check_state"] = state_params[f"{do}_state"]
+    state = state_params[f"{do}_state"]
     if state_params.get(f"{do}_location"):
         state_params["show_location"] = state_params[f"{do}_location"]
     if do == "set":
@@ -212,7 +212,7 @@ def _state_check_chain(
     for composite_type, composite_name in zip(composite_types, composite_names):
         state_params[composite_type] = composite_name
     state_params["states_chain"] = composite_types[-1]
-    state_exists = check_states(state_params, env)
+    state_exists = state in show_states(state_params, env)
 
     return state_exists
 
@@ -240,60 +240,9 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
             )
             continue
 
-        logging.debug(
-            "Checking %s for available %s states using %s",
-            params_obj_name,
-            params_obj_type,
-            state_params["states"],
-        )
-        state_backend = BACKENDS[state_params["states"]]
-        params_obj_states = state_backend.show(state_params, env)
-        logging.info(
-            "Detected %s states for %s: %s",
-            params_obj_type,
-            params_obj_name,
-            ", ".join(params_obj_states),
-        )
-        states += params_obj_states
-    return states
-
-
-def check_states(run_params: Params, env: Env = None) -> bool:
-    """
-    Check whether a given state exits.
-
-    :param run_params: configuration parameters
-    :returns: whether the given state exists
-
-    .. note:: We can check for multiple states of multiple objects at the
-        same time through our choice of configuration.
-    """
-    for state_params in _parametric_object_iteration(run_params):
-        params_obj_name = state_params["object_name"]
-        params_obj_type = state_params["object_type"]
-        if params_obj_type in state_params.objects("skip_types"):
-            continue
-        if params_obj_type == "nets/vms/images" and state_params.get_boolean(
-            "image_readonly", False
-        ):
-            logging.warning(
-                f"Incorrect configuration: cannot use any state "
-                f"from readonly image {params_obj_name} - skipping"
-            )
-            continue
-
-        # if the snapshot is not defined skip (leaf tests that are no setup)
-        if not state_params.get("check_state"):
-            logging.debug(
-                f"Skip checking any {params_obj_type} state for {params_obj_name}"
-            )
-            continue
-        else:
-            state = state_params["check_state"]
-        # NOTE: there is no concept of "check_mode" here
-        state_params["check_opts"] = state_params.get("check_opts", "soft_boot=yes")
-        # TODO: document after experimental period
-        state_params["check_mode"] = state_params.get("check_mode", "rf")
+        # TODO: document after experimental period or rather refactor
+        state_params["show_mode"] = state_params.get("show_mode", "rf")
+        state_params["show_opts"] = state_params.get("show_opts", "soft_boot=yes")
 
         state_backend = BACKENDS[state_params["states"]]
         # TODO: we don't support other parametric object instances
@@ -304,8 +253,8 @@ def check_states(run_params: Params, env: Env = None) -> bool:
         #                       params_obj_name, state_params, None)
         state_object = env if params_obj_type == "nets" else vm
 
-        action_if_root_exists = state_params["check_mode"][0]
-        action_if_root_doesnt_exist = state_params["check_mode"][1]
+        action_if_root_exists = state_params["show_mode"][0]
+        action_if_root_doesnt_exist = state_params["show_mode"][1]
 
         # always check the corresponding root state as a prerequisite
         root_exists = state_backend.check_root(state_params, state_object)
@@ -339,15 +288,23 @@ def check_states(run_params: Params, env: Env = None) -> bool:
         else:
             state_backend.get_root(root_params, state_object)
 
-        if state in ROOTS:
-            state_exists = root_exists
-        else:
-            state_exists = state in state_backend.show(state_params, state_object)
+        logging.debug(
+            "Checking %s for available %s states using %s",
+            params_obj_name,
+            params_obj_type,
+            state_params["states"],
+        )
+        state_backend = BACKENDS[state_params["states"]]
+        params_obj_states = state_backend.show(state_params, env)
+        logging.info(
+            "Detected %s states for %s: %s",
+            params_obj_type,
+            params_obj_name,
+            ", ".join(params_obj_states),
+        )
+        states += params_obj_states
 
-        if not state_exists:
-            return False
-
-    return True
+    return states
 
 
 def get_states(run_params: Params, env: Env = None) -> None:
