@@ -35,7 +35,10 @@ logging.info("%s control file.", NAME)
 # MAIN PART
 
 logging.info(f"Added utility path {utility_path}")
-log.getLogger("aexpect").parent = log.getLogger("avocado.extlib")
+log.getLogger("aexpect").level = log.DEBUG
+log.getLogger("guibot").level = log.DEBUG
+log.getLogger("vncdotool").level = log.DEBUG
+log.getLogger("pyi2ncommon").level = log.DEBUG
 logging.info(f"Setting network class for state backend")
 VMNetBackend.network_class = VMNetwork
 
