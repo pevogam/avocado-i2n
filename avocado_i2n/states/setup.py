@@ -200,11 +200,9 @@ def _state_check_chain(
     if state_params.get(f"{do}_location"):
         state_params["show_location"] = state_params[f"{do}_location"]
     if do == "set":
-        state_params["check_mode"] = "rf"
         state_params["check_opts"] = "soft_boot=yes"
         state_params["soft_boot"] = "yes"
     else:
-        state_params["check_mode"] = "ff"
         state_params["check_opts"] = "soft_boot=no"
         state_params["soft_boot"] = "no"
 
