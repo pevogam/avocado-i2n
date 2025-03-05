@@ -105,7 +105,7 @@ class RamfileBackend(SourcedStateBackend):
 
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, params["object_id"])
-        state_file = os.path.join(vm_dir, params["check_state"] + ".state")
+        state_file = os.path.join(vm_dir, params["get_state"] + ".state")
         vm.restore_from_file(state_file)
         vm.resume(timeout=3)
 
@@ -122,7 +122,7 @@ class RamfileBackend(SourcedStateBackend):
 
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, params["object_id"])
-        state_file = os.path.join(vm_dir, params["check_state"] + ".state")
+        state_file = os.path.join(vm_dir, params["set_state"] + ".state")
         if os.path.exists(state_file):
             os.unlink(state_file)
         vm.save_to_file(state_file)
@@ -164,7 +164,7 @@ class RamfileBackend(SourcedStateBackend):
 
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, params["object_id"])
-        state_file = os.path.join(vm_dir, params["check_state"] + ".state")
+        state_file = os.path.join(vm_dir, params["unset_state"] + ".state")
         os.unlink(state_file)
 
     @classmethod
