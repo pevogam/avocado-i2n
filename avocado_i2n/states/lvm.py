@@ -83,6 +83,7 @@ class LVMBackend(StateBackend):
 
         All arguments match the base class.
         """
+        cls.check_root(params, object)
         vm_name = params["vms"]
         mount_loc = cls._get_image_mount_loc(params)
         params["lv_snapshot_name"] = params["get_state"]
@@ -114,6 +115,7 @@ class LVMBackend(StateBackend):
 
         All arguments match the base class.
         """
+        cls.check_root(params, object)
         vm_name = params["vms"]
         params["lv_snapshot_name"] = params["set_state"]
         logging.info("Taking a snapshot '%s' of %s", params["set_state"], vm_name)
@@ -130,6 +132,7 @@ class LVMBackend(StateBackend):
 
         :raises: :py:class:`ValueError` if LV pointer state was used
         """
+        cls.check_root(params, object)
         vm_name = params["vms"]
         lv_pointer = params["lv_pointer_name"]
         if params["unset_state"] == lv_pointer:
@@ -175,6 +178,7 @@ class LVMBackend(StateBackend):
         Create a disk, virtual group, thin pool and logical volume
         for each object.
         """
+        cls.check_root(params, object)
         vm_name = params["vms"]
         mount_loc = cls._get_image_mount_loc(params)
         logging.info("Creating original logical volume for %s", vm_name)
@@ -234,6 +238,7 @@ class LVMBackend(StateBackend):
         Remove the disk, virtual group, thin pool and logical volume
         of each object.
         """
+        cls.check_root(params, object)
         vm_name = params["vms"]
         mount_loc = cls._get_image_mount_loc(params)
         logging.info("Removing original logical volume for %s", vm_name)

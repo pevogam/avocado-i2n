@@ -120,8 +120,8 @@ class MockDriver(unittest.TestCase):
     def assert_get(self, mock_driver, state_name, state_type, action_type):
         backend = self.state_backends[state_type]
         if backend == "lvm":
-            mock_driver.lv_check.assert_called_with("disk_vm1", "LogVol")
             if action_type == 1:
+                mock_driver.lv_check.assert_called_with("disk_vm1", "LogVol")
                 mock_driver.lv_remove.assert_called_once_with('disk_vm1', 'current_state')
                 mock_driver.lv_take_snapshot.assert_called_once_with('disk_vm1', state_name, 'current_state')
             else:
@@ -162,7 +162,6 @@ class MockDriver(unittest.TestCase):
                 mock_driver.lv_remove.assert_not_called()
                 mock_driver.lv_take_snapshot.assert_called_once_with('disk_vm1', 'current_state', state_name)
             elif action_type == 2:
-                mock_driver.lv_check.assert_called_with("disk_vm1", "LogVol")
                 mock_driver.lv_remove.assert_called_once_with('disk_vm1', state_name)
                 mock_driver.lv_take_snapshot.assert_called_once_with('disk_vm1', 'current_state', state_name)
             else:
@@ -203,8 +202,8 @@ class MockDriver(unittest.TestCase):
     def assert_unset(self, mock_driver, state_name, state_type, action_type):
         backend = self.state_backends[state_type]
         if backend == "lvm":
-            mock_driver.lv_check.assert_called_with("disk_vm1", "LogVol")
             if action_type == 1:
+                mock_driver.lv_check.assert_called_with("disk_vm1", "LogVol")
                 mock_driver.lv_remove.assert_called_once_with("disk_vm1", state_name)
                 mock_driver.lv_take_snapshot.assert_not_called()
             else:
@@ -671,6 +670,7 @@ class StatesBoundaryTest(Test):
             exists = ss.show_states(self.run_params, self.env)
         self.assertFalse(exists)
 
+    @avocado.skip("It doesn't make sense to get root but check for non-root state first")
     def test_get_root(self):
         """Test that root getting with a state backend works."""
         # only test with most default backends

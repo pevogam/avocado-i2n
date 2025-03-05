@@ -102,6 +102,7 @@ class QCOW2Backend(RootSourcedStateBackend):
 
         All arguments match the base class.
         """
+        cls.check_root(params, object)
         vm, vm_name = object, params["vms"]
         state, image = params["get_state"], params["images"]
         params["image_chain"] = f"{image} snapshot"
@@ -120,6 +121,7 @@ class QCOW2Backend(RootSourcedStateBackend):
 
         All arguments match the base class.
         """
+        cls.check_root(params, object)
         vm, vm_name = object, params["vms"]
         state, image = params["set_state"], params["images"]
         params["image_chain"] = f"{image} snapshot"
@@ -138,6 +140,7 @@ class QCOW2Backend(RootSourcedStateBackend):
 
         All arguments match the base class.
         """
+        cls.check_root(params, object)
         vm, vm_name = object, params["vms"]
         state, image = params["unset_state"], params["images"]
         params["image_chain"] = f"{image} snapshot"
@@ -202,6 +205,7 @@ class QCOW2Backend(RootSourcedStateBackend):
 
         All arguments match the base class.
         """
+        cls.check_root(params, object)
         vm_name = params["vms"]
         if object is not None and object.is_alive():
             object.destroy(gracefully=params.get_boolean("soft_boot", True))
@@ -223,6 +227,7 @@ class QCOW2Backend(RootSourcedStateBackend):
 
         All arguments match the base class.
         """
+        cls.check_root(params, object)
         vm_name = params["vms"]
         if object is not None and object.is_alive():
             object.destroy(gracefully=params.get_boolean("soft_boot", True))
@@ -460,6 +465,7 @@ class QCOW2VTBackend(QCOW2Backend):
 
         All arguments match the base class.
         """
+        cls.check_root(params, object)
         vm, vm_name = object, params["vms"]
         logging.info("Reusing vm state '%s' of %s", params["get_state"], vm_name)
         vm.pause()
@@ -473,6 +479,7 @@ class QCOW2VTBackend(QCOW2Backend):
 
         All arguments match the base class.
         """
+        cls.check_root(params, object)
         vm, vm_name = object, params["vms"]
         logging.info("Setting vm state '%s' of %s", params["set_state"], vm_name)
         vm.pause()
@@ -486,6 +493,7 @@ class QCOW2VTBackend(QCOW2Backend):
 
         All arguments match the base class.
         """
+        cls.check_root(params, object)
         vm, vm_name = object, params["vms"]
         logging.info("Removing vm state '%s' of %s", params["unset_state"], vm_name)
         vm.pause()
@@ -543,6 +551,7 @@ class QCOW2VTBackend(QCOW2Backend):
         ..todo:: Study better the environment pre/postprocessing details necessary
                  for flawless vm destruction and creation to improve these.
         """
+        cls.check_root(params, object)
         vm_name = params["vms"]
 
         for image_name in params.objects("images"):
@@ -582,6 +591,7 @@ class QCOW2VTBackend(QCOW2Backend):
 
         All arguments match the base class.
         """
+        cls.check_root(params, object)
         vm_name = params["vms"]
         logging.info("Shutting down %s to prevent boot state", vm_name)
         vm = object
