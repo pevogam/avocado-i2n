@@ -43,7 +43,6 @@ logging = log.getLogger("avocado.job." + __name__)
 #: list of all available state backends and operations
 __all__ = [
     "BACKENDS",
-    "ROOTS",
     "show_states",
     "get_states",
     "set_states",
@@ -141,8 +140,6 @@ class StateBackend:
 
 #: available state backend implementations
 BACKENDS = {}
-#: keywords reserved for root states
-ROOTS = ["root", "boot"]
 
 
 def _parametric_object_iteration(
@@ -286,15 +283,10 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
         elif root_exists and "r" == action_if_exists:
             state_backend.get_root(root_params, state_object)
         elif root_exists and "f" == action_if_exists:
-            logging.info("Recreating present state management preconditions")
+            logging.info("Removing present state management preconditions")
             root_params["pool_scope"] = "own"
-            # TODO: implement unset root for all parametric object types
-            if params_obj_type == "nets/vms":
-                vm.destroy(gracefully=root_params.get("show_switch", "soft") == "soft")
-            else:
-                state_backend.unset_root(root_params, state_object)
-            state_backend.set_root(root_params, state_object)
-            root_exists = True
+            state_backend.unset_root(root_params, state_object)
+            root_exists = False
         elif root_exists:
             raise exceptions.TestError(
                 "Invalid policy %s: The action on met state management preconditions "
@@ -403,10 +395,7 @@ def get_states(run_params: Params, env: Env = None) -> None:
                 "either of 'abort', 'reuse', 'ignore'." % state_params["get_mode"]
             )
 
-        if state_params["get_state"] in ROOTS:
-            state_backend.get_root(state_params, state_object)
-        else:
-            state_backend.get(state_params, state_object)
+        state_backend.get(state_params, state_object)
 
 
 def set_states(run_params: Params, env: Env = None) -> None:
@@ -468,21 +457,18 @@ def set_states(run_params: Params, env: Env = None) -> None:
         elif state_exists and "f" == action_if_exists:
             logging.info("Overwriting the already existing snapshot")
             state_params["unset_state"] = state_params["set_state"]
-            if state_params["set_state"] in ROOTS:
-                state_backend.unset_root(state_params, state_object)
-            else:
-                from .pool import SourcedStateBackend
+            from .pool import SourcedStateBackend
 
-                if issubclass(state_backend, SourcedStateBackend):
-                    # overwriting arbitrary external states in the backing chain can result in invalid
-                    # derivative states when branching out and other problems, do this only manually if
-                    # you really know what you are doing which would depend on a case-by-case basis
-                    logging.warning(
-                        "Preserving the already existing snapshot due to overwrite dependency coupling"
-                    )
-                else:
-                    logging.info("Removing the already existing snapshot")
-                    state_backend.unset(state_params, state_object)
+            if issubclass(state_backend, SourcedStateBackend):
+                # overwriting arbitrary external states in the backing chain can result in invalid
+                # derivative states when branching out and other problems, do this only manually if
+                # you really know what you are doing which would depend on a case-by-case basis
+                logging.warning(
+                    "Preserving the already existing snapshot due to overwrite dependency coupling"
+                )
+            else:
+                logging.info("Removing the already existing snapshot")
+                state_backend.unset(state_params, state_object)
         elif state_exists:
             raise exceptions.TestError(
                 "Invalid policy %s: The end action on present state can be "
@@ -495,23 +481,14 @@ def set_states(run_params: Params, env: Env = None) -> None:
                 "due to passive mode." % (state_params["set_state"], params_obj_name)
             )
         elif not state_exists and "f" == action_if_doesnt_exist:
-            if not state_params["set_state"] in ROOTS and not state_backend.check_root(
-                state_params, state_object
-            ):
-                raise exceptions.TestError(
-                    "Cannot force set state without a root state, use enforcing check "
-                    "policy to also force root (existing stateful object) creation."
-                )
+            logging.info("Creating a new snapshot %s", state)
         elif not state_exists:
             raise exceptions.TestError(
                 "Invalid policy %s: The end action on missing state can be "
                 "either of 'abort', 'force'." % state_params["set_mode"]
             )
 
-        if state_params["set_state"] in ROOTS:
-            state_backend.set_root(state_params, state_object)
-        else:
-            state_backend.set(state_params, state_object)
+        state_backend.set(state_params, state_object)
 
 
 def unset_states(run_params: Params, env: Env = None) -> None:
@@ -592,10 +569,7 @@ def unset_states(run_params: Params, env: Env = None) -> None:
                 "either of 'reuse', 'force'." % state_params["unset_mode"]
             )
 
-        if state_params["unset_state"] in ROOTS:
-            state_backend.unset_root(state_params, state_object)
-        else:
-            state_backend.unset(state_params, state_object)
+        state_backend.unset(state_params, state_object)
 
 
 def push_states(run_params: Params, env: Env = None) -> None:
@@ -612,9 +586,6 @@ def push_states(run_params: Params, env: Env = None) -> None:
             continue
         else:
             state = state_params["push_state"]
-        if state in ROOTS:
-            # cannot be done with root states
-            continue
 
         # restrict parametric objects of this type in the subroutine
         composite_types = params_obj_type.split("/")
@@ -643,9 +614,6 @@ def pop_states(run_params: Params, env: Env = None) -> None:
             continue
         else:
             state = state_params["pop_state"]
-        if state in ROOTS:
-            # cannot be done with root states
-            continue
 
         # restrict parametric objects of this type in the subroutine
         composite_types = params_obj_type.split("/")
