@@ -1259,7 +1259,7 @@ class TestNode(Runnable):
                 door.run_subcontrol(session, mod_control_path)
                 should_run = False
             except ShellCmdError as error:
-                if "AssertionError" in error.output:
+                if "AssertionError" in error.output or "TestAbortError" in error.output:
                     should_run = True
                 else:
                     raise RuntimeError(
