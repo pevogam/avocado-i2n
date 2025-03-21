@@ -337,7 +337,7 @@ class StoreThread(QtCore.QThread):
         self.gui.vm.params["vms"] = self.gui.vm.name
         self.gui.vm.params["set_state"] = self.gui.line_state.text()
         self.gui.vm.params["set_type"] = "on"
-        self.gui.vm.params["set_mode"] = "ff"
+        self.gui.vm.params["set_mode"] = "ffrf"
         ss.set_states(self.gui.vm.params, self.gui.vmnet.env)
 
 
@@ -360,7 +360,7 @@ class RetrieveThread(QtCore.QThread):
         for item in self.gui.list_view.selectedItems():
             self.gui.vm.params["get_state"] = item.text()
             self.gui.vm.params["get_type"] = "on"
-            self.gui.vm.params["get_mode"] = "ri"
+            self.gui.vm.params["get_mode"] = "rirf"
             ss.get_states(self.gui.vm.params, self.gui.vmnet.env)
 
 
@@ -383,7 +383,7 @@ class RemoveThread(QtCore.QThread):
         for item in self.gui.list_view.selectedItems():
             self.gui.vm.params["unset_state"] = item.text()
             self.gui.vm.params["unset_type"] = "on"
-            self.gui.vm.params["unset_mode"] = "fi"
+            self.gui.vm.params["unset_mode"] = "firi"
             ss.unset_states(self.gui.vm.params, self.gui.vmnet.env)
             self.gui.list_view.takeItem(self.gui.list_view.row(item))
 

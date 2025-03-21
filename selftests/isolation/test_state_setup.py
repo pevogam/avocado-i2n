@@ -277,7 +277,6 @@ class StatesBoundaryTest(Test):
         self.run_params["states_images"] = "mock"
         self.run_params["states_vms"] = "mock"
         self.run_params["show_state"] = ".+"
-        self.run_params["show_mode"] = "rr"
         self.run_params["nets_gateway"] = ""
         self.run_params["nets_host"] = ""
         self.run_params["pool_scope"] = "own"
@@ -475,6 +474,8 @@ class StatesBoundaryTest(Test):
         """
         backend = "qcow2"
         backend_type = self._prepare_driver_from_backend(backend)
+        # keep a passive precondition behavior for this test
+        self.run_params["show_mode"] = "ri"
 
         # assert behavior on root and state availability
         with self.driver.mock_show(["launch"], backend_type, True) as driver:
@@ -500,6 +501,8 @@ class StatesBoundaryTest(Test):
         """
         backend = "qcow2vt"
         backend_type = self._prepare_driver_from_backend(backend)
+        # keep a passive precondition behavior for this test
+        self.run_params["show_mode"] = "ri"
 
         with self.driver.mock_show(["launch"], backend_type, True) as driver:
             self.driver.exist_switch = False
@@ -518,25 +521,25 @@ class StatesBoundaryTest(Test):
     def test_get_image_lvm(self):
         """Test that state getting with the LVM backend works with available root."""
         # use a nondefault policy that doesn't raise any errors here
-        self.run_params["get_mode_vm1"] = "ri"
+        self.run_params["get_mode_vm1"] = "riri"
         self._test_get_state("lvm")
 
     def test_get_image_qcow2(self):
         """Test that state getting with the QCOW2 backend works with available root."""
         # use a nondefault policy that doesn't raise any errors here
-        self.run_params["get_mode_vm1"] = "ri"
+        self.run_params["get_mode_vm1"] = "riri"
         self._test_get_state("qcow2")
 
     def test_get_vm_qcow2(self):
         """Test that state getting with the QCOW2VT backend works with available root."""
         # use a nondefault policy that doesn't raise any errors here
-        self.run_params["get_mode_vm1"] = "ri"
+        self.run_params["get_mode_vm1"] = "riri"
         self._test_get_state("qcow2vt")
 
     def test_get_vm_ramfile(self):
         """Test that state getting with the ramdisk backend works with available root."""
         # use a nondefault policy that doesn't raise any errors here
-        self.run_params["get_mode_vm1"] = "ri"
+        self.run_params["get_mode_vm1"] = "riri"
         self._test_get_state("ramfile")
 
     def test_set_image_lvm(self):
@@ -590,6 +593,8 @@ class StatesBoundaryTest(Test):
         """Test that root checking with the LVM backend works."""
         backend = "lvm"
         backend_type = self._prepare_driver_from_backend(backend)
+        # keep a passive precondition behavior for this test
+        self.run_params["show_mode"] = "ri"
 
         # assert root state is correctly detected
         with self.driver.mock_show([], backend_type, True) as driver:
@@ -611,6 +616,8 @@ class StatesBoundaryTest(Test):
         self.run_params["images_vm1"] = "image1 image2"
         self.run_params["image_name_image1_vm1"] = "vm1/image1"
         self.run_params["image_name_image2_vm1"] = "vm1/image2"
+        # keep a passive precondition behavior for this test
+        self.run_params["show_mode"] = "ri"
 
         # assert root state is correctly detected
         with self.driver.mock_show([], backend_type, True) as driver:
@@ -632,6 +639,8 @@ class StatesBoundaryTest(Test):
         """Test that root checking with the QCOW2VT backend works."""
         backend = "qcow2vt"
         backend_type = self._prepare_driver_from_backend(backend)
+        # keep a passive precondition behavior for this test
+        self.run_params["show_mode"] = "ri"
 
         # assert root state is correctly detected
         with self.driver.mock_show([], backend_type, True) as driver:
@@ -653,6 +662,8 @@ class StatesBoundaryTest(Test):
         self.run_params["images_vm1"] = "image1 image2"
         self.run_params["image_name_image1_vm1"] = "vm1/image1"
         self.run_params["image_name_image2_vm1"] = "vm1/image2"
+        # keep a passive precondition behavior for this test
+        self.run_params["show_mode"] = "ri"
 
         # assert root state is correctly detected
         for image_format in ["qcow2", "raw", "something-else"]:
@@ -706,6 +717,8 @@ class StatesBoundaryTest(Test):
         self.run_params["image_raw_device_vm1"] = "no"
         # TODO: LVM is still internally tied to QCOW images and needs testing otherwise
         self.run_params["image_format"] = "qcow2"
+        # keep a passive precondition behavior for this test
+        self.run_params["set_mode"] = "ffri"
 
         def process_run_side_effect(cmd, **kwargs):
             if cmd == "pvs":
@@ -745,6 +758,8 @@ class StatesBoundaryTest(Test):
         backend = "qcow2"
         backend_type = self._prepare_driver_from_backend(backend)
         self.run_params[f"set_state_{backend_type}s_vm1"] = "root"
+        # keep a passive precondition behavior for this test
+        self.run_params["set_mode"] = "ffri"
 
         # assert root state is detected and overwritten
         mock_env_process.reset_mock()
@@ -782,6 +797,9 @@ class StatesBoundaryTest(Test):
     @mock.patch('avocado_i2n.states.qcow2.env_process')
     def test_set_root_vm(self, _mock_env1, _mock_env2):
         """Test that root setting with a vm state backend works."""
+        # keep a passive precondition behavior for this test
+        self.run_params["set_mode"] = "ffri"
+
         for backend in ["qcow2vt", "ramfile"]:
             with self.subTest(f"Testing set root for backend {backend}"):
                 backend_type = self._prepare_driver_from_backend(backend)
@@ -1908,41 +1926,148 @@ class StatesSetupTest(Test):
             self.mock_vms[vm_name].name = vm_name
             self.mock_vms[vm_name].params = self.run_params.object_params(vm_name)
 
-    def test_check_root(self):
-        """Test that state checking with a state backend can get roots."""
+    def test_show_regex(self):
+        """Test that state showing can be filtered correctly."""
         self._set_up_generic_params("show", "state", "objects", "object1")
 
-        # assert root state is not detected then created to check the actual state
-        self.backend.check_root.return_value = True
-        self.backend.show.return_value = []
-        exists = ss.show_states(self.run_params, self.env)
-        # assert root state is checked as a prerequisite
-        self.backend.check_root.assert_called_once()
-        # assert root state is always made available (provision for state checks)
-        self.backend.get_root.assert_called_once()
+        # assert state showing is performed if state is available
+        self.backend.reset_mock()
+        self.backend.check.return_value = True
+        self.backend.show.return_value = ["state", "on_state", "else"]
 
+        states = ss.show_states(self.run_params, self.env)
+        # assert root state is checked as a prerequisite
+        self.backend.check.assert_called_once()
+        # assert root state is reused
+        self.backend.initialize.assert_not_called()
+        self.backend.finalize.assert_not_called()
         # assert actual state is still checked and not available
         self.backend.show.assert_called_once()
-        self.assertFalse(exists)
+        self.assertEqual(states, ["state"])
 
-    def test_check_forced_root(self):
-        """Test that state checking with a state backend can set roots."""
+    def test_show_rx(self):
+        """Test that state showing works with reuse policies."""
         self._set_up_generic_params("show", "state", "objects", "object1")
-        # TODO: should we check other policies or keep root-related behavior at all?
+
+        # assert state showing is performed if state is available
+        self.backend.reset_mock()
+        self.backend.check_root.return_value = True
+        self.backend.show.return_value = ["state"]
+        states = ss.show_states(self.run_params, self.env)
+        # assert root state is checked as a prerequisite
+        self.backend.check_root.assert_called_once()
+        # assert root state is reused
+        self.backend.get_root.assert_called_once()
+        # assert actual state is still checked and not available
+        self.backend.show.assert_called_once()
+        self.assertEqual(states, ["state"])
+
+        # assert state showing is aborted if preconditions are not met
+        self.backend.reset_mock()
+        self.backend.check_root.return_value = False
+        with self.assertRaises(exceptions.TestAbortError):
+            ss.show_states(self.run_params, self.env)
+        # assert root state is checked as a prerequisite
+        self.backend.check_root.assert_called_once()
+        # boundary code should not be reached
+        self.backend.show.assert_not_called()
+
+    def test_show_aa(self):
+        """Test that state showing works with abort policies."""
+        self._set_up_generic_params("show", "state", "objects", "object1")
+        self.run_params["show_mode"] = "aa"
+
+        # assert state showing is aborted if preconditions are met
+        self.backend.reset_mock()
+        self.backend.check_root.return_value = True
+        with self.assertRaises(exceptions.TestAbortError):
+            ss.show_states(self.run_params, self.env)
+        # assert root state is checked as a prerequisite
+        self.backend.check_root.assert_called_once()
+        # boundary code should not be reached
+        self.backend.show.assert_not_called()
+
+        # assert state showing is aborted if preconditions are not met
+        self.backend.reset_mock()
+        self.backend.check_root.return_value = False
+        with self.assertRaises(exceptions.TestAbortError):
+            ss.show_states(self.run_params, self.env)
+        # assert root state is checked as a prerequisite
+        self.backend.check_root.assert_called_once()
+        # boundary code should not be reached
+        self.backend.show.assert_not_called()
+
+    def test_show_ff(self):
+        """Test that state showing works with force policies."""
+        self._set_up_generic_params("show", "state", "objects", "object1")
         self.run_params["show_mode"] = "ff"
 
-        # assert root state is not detected then created to check the actual state
-        self.backend.check_root.return_value = False
+        # assert root state is detected then recreated to check the actual state
+        self.backend.check_root.return_value = True
         self.backend.show.return_value = []
-        exists = ss.show_states(self.run_params, self.env)
+        states = ss.show_states(self.run_params, self.env)
         # assert root state is checked as a prerequisite
         self.backend.check_root.assert_called_once()
-        # assert root state is provided from the check
+        # assert root state is always made available (forced provision if not available)
         self.backend.set_root.assert_called_once()
-
         # assert actual state is still checked and not available
         self.backend.show.assert_called_once()
-        self.assertFalse(exists)
+        self.assertEqual(states, [])
+
+        # assert root state is not detected then created to check the actual state
+        self.backend.reset_mock()
+        self.backend.check_root.return_value = False
+        self.backend.show.return_value = []
+        states = ss.show_states(self.run_params, self.env)
+        # assert root state is checked as a prerequisite
+        self.backend.check_root.assert_called_once()
+        # assert root state is recreated (forced provision if available)
+        self.backend.set_root.assert_called_once()
+        # assert actual state is still checked and not available
+        self.backend.show.assert_called_once()
+        self.assertEqual(states, [])
+
+    def test_show_xi(self):
+        """Test that state showing works with ignore policies."""
+        self._set_up_generic_params("show", "state", "objects", "object1")
+        self.run_params["show_mode"] = "xi"
+
+        # assert state retrieval is ignored if state is available
+        self.backend.reset_mock()
+        self.backend.check_root.return_value = False
+        states = ss.show_states(self.run_params, self.env)
+        # assert root state is checked as a prerequisite
+        self.backend.check_root.assert_called_once()
+        # assert root state is not reused and fully ignored
+        self.backend.get_root.assert_not_called()
+        # boundary code should not be reached
+        self.backend.show.assert_not_called()
+        self.assertEqual(states, [])
+
+    def test_show_xx(self):
+        """Test that state showing detects invalid policies."""
+        self._set_up_generic_params("show", "state", "objects", "object1")
+        self.run_params["show_mode"] = "xx"
+
+        # assert invalid policy x if preconditions are met
+        self.backend.reset_mock()
+        self.backend.check_root.return_value = True
+        with self.assertRaises(exceptions.TestError):
+            ss.show_states(self.run_params, self.env)
+        # assert root state is checked as a prerequisite
+        self.backend.check_root.assert_called_once()
+        # boundary code should not be reached
+        self.backend.show.assert_not_called()
+
+        # assert invalid policy x if preconditions are not met
+        self.backend.reset_mock()
+        self.backend.check_root.return_value = False
+        with self.assertRaises(exceptions.TestError):
+            ss.show_states(self.run_params, self.env)
+        # assert root state is checked as a prerequisite
+        self.backend.check_root.assert_called_once()
+        # boundary code should not be reached
+        self.backend.show.assert_not_called()
 
     @mock.patch("avocado_i2n.states.setup.show_states")
     def test_get(self, mock_show):
@@ -1974,7 +2099,7 @@ class StatesSetupTest(Test):
     def test_get_aa(self):
         """Test that state getting works with abort policies."""
         self._set_up_generic_params("get", "state", "objects", "object1")
-        self.run_params["get_mode"] = "aa"
+        self.run_params["get_mode"] = "aaxx"
 
         # assert state retrieval is aborted if state is available
         self.backend.reset_mock()
@@ -1995,7 +2120,7 @@ class StatesSetupTest(Test):
     def test_get_rx(self):
         """Test that state getting works with reuse policy."""
         self._set_up_generic_params("get", "state", "objects", "object1")
-        self.run_params["get_mode"] = "rx"
+        self.run_params["get_mode"] = "rxxx"
 
         # assert state retrieval is reused if available
         self.backend.reset_mock()
@@ -2007,7 +2132,7 @@ class StatesSetupTest(Test):
     def test_get_ii(self):
         """Test that state getting works with ignore policies."""
         self._set_up_generic_params("get", "state", "objects", "object1")
-        self.run_params["get_mode"] = "ii"
+        self.run_params["get_mode"] = "iixx"
 
         # assert state retrieval is ignored if state is available
         self.backend.reset_mock()
@@ -2026,7 +2151,7 @@ class StatesSetupTest(Test):
     def test_get_xx(self):
         """Test that state getting detects invalid policies."""
         self._set_up_generic_params("get", "state", "objects", "object1")
-        self.run_params["get_mode"] = "xx"
+        self.run_params["get_mode"] = "xxxx"
 
         # assert invalid policy x if state is available
         self.backend.reset_mock()
@@ -2084,7 +2209,7 @@ class StatesSetupTest(Test):
     def test_set_aa(self):
         """Test that state setting works with abort policies."""
         self._set_up_generic_params("set", "state", "objects", "object1")
-        self.run_params["set_mode"] = "aa"
+        self.run_params["set_mode"] = "aaxx"
 
         # assert state saving is aborted if state is available
         self.backend.reset_mock()
@@ -2105,7 +2230,7 @@ class StatesSetupTest(Test):
     def test_set_rx(self):
         """Test that state setting works with reuse policy."""
         self._set_up_generic_params("set", "state", "objects", "object1")
-        self.run_params["set_mode"] = "rx"
+        self.run_params["set_mode"] = "rxxx"
 
         # assert state saving is skipped if reusable state is available
         self.backend.reset_mock()
@@ -2117,7 +2242,7 @@ class StatesSetupTest(Test):
     def test_set_ff(self):
         """Test that state setting works with force policies."""
         self._set_up_generic_params("set", "state", "objects", "object1")
-        self.run_params["set_mode"] = "ff"
+        self.run_params["set_mode"] = "ffxx"
 
         # assert state saving is forced if state is available
         self.backend.reset_mock()
@@ -2147,7 +2272,7 @@ class StatesSetupTest(Test):
     def test_set_xx(self):
         """Test that state setting detects invalid policies."""
         self._set_up_generic_params("set", "state", "objects", "object1")
-        self.run_params["set_mode"] = "xx"
+        self.run_params["set_mode"] = "xxxx"
 
         # assert invalid policy x if state is available
         self.backend.reset_mock()
@@ -2194,7 +2319,7 @@ class StatesSetupTest(Test):
     def test_unset_ra(self):
         """Test that state unsetting works with reuse and abort policy."""
         self._set_up_generic_params("unset", "state", "objects", "object1")
-        self.run_params["unset_mode"] = "ra"
+        self.run_params["unset_mode"] = "raxx"
 
         # assert state removal is skipped if reusable state is available
         self.backend.reset_mock()
@@ -2213,7 +2338,7 @@ class StatesSetupTest(Test):
     def test_unset_fi(self):
         """Test that state unsetting works with force and ignore policy."""
         self._set_up_generic_params("unset", "state", "objects", "object1")
-        self.run_params["unset_mode"] = "fi"
+        self.run_params["unset_mode"] = "fixx"
 
         # assert state removal is forced if state is available
         self.backend.reset_mock()
@@ -2232,7 +2357,7 @@ class StatesSetupTest(Test):
     def test_unset_xx(self):
         """Test that state unsetting detects invalid policies."""
         self._set_up_generic_params("unset", "state", "objects", "object1")
-        self.run_params["unset_mode"] = "xx"
+        self.run_params["unset_mode"] = "xxxx"
 
         # assert invalid policy x if state is available
         self.backend.reset_mock()
@@ -2253,7 +2378,7 @@ class StatesSetupTest(Test):
     def test_push(self):
         """Test that pushing with a state backend works."""
         self._set_up_generic_params("push", "state", "objects", "object1")
-        self.run_params["push_mode"] = "ff"
+        self.run_params["push_mode"] = "ffrf"
 
         self.backend.reset_mock()
         with mock.patch('avocado_i2n.states.setup.show_states',
@@ -2349,8 +2474,8 @@ class StatesSetupTest(Test):
         self.run_params["get_state_images_image2_vm1"] = "launch21"
         self.run_params["get_state_images_vm2"] = "launch2"
         self.run_params["get_state_vms_vm3"] = "launch3"
-        self.run_params["get_mode"] = "ra"
-        self.run_params["get_mode_vm2"] = "ii"
+        self.run_params["get_mode"] = "rara"
+        self.run_params["get_mode_vm2"] = "iira"
         self.run_params["skip_types"] = "nets"
         self._create_mock_vms()
 
@@ -2397,8 +2522,8 @@ class StatesSetupTest(Test):
         self.run_params["set_state_images_image22_vm2"] = "launch22"
         self.run_params["set_state_images_vm3"] = "launch3"
         self.run_params["set_state_vms_vm4"] = "launch4"
-        self.run_params["set_mode"] = "fa"
-        self.run_params["set_mode_vm3"] = "ff"
+        self.run_params["set_mode"] = "fara"
+        self.run_params["set_mode_vm3"] = "ffra"
         self.run_params["skip_types"] = "nets"
         self._create_mock_vms()
 
@@ -2452,8 +2577,8 @@ class StatesSetupTest(Test):
         self.run_params["unset_state_images_vm1"] = "launch1"
         self.run_params["unset_state_images_image2_vm1"] = "launch2"
         self.run_params["unset_state_images_vm4"] = "launch4"
-        self.run_params["unset_mode_vm1"] = "fi"
-        self.run_params["unset_mode_vm4"] = "fa"
+        self.run_params["unset_mode_vm1"] = "fira"
+        self.run_params["unset_mode_vm4"] = "fara"
         self.run_params["skip_types"] = "nets"
         self._create_mock_vms()
 

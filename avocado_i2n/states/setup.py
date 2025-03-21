@@ -196,6 +196,7 @@ def _state_check_chain(
     :param state_params: image parameters of the vm's image which is processed
     """
     state_params["show_state"] = state_params[f"{do}_state"]
+    state_params["show_mode"] = state_params[f"{do}_mode"][2:]
     if state_params.get(f"{do}_location"):
         state_params["show_location"] = state_params[f"{do}_location"]
     if do == "set":
@@ -248,7 +249,7 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
         else:
             state = "^" + state_params["show_state"] + "$"
         # TODO: document after experimental period or rather refactor
-        state_params["show_mode"] = state_params.get("show_mode", "rf")
+        state_params["show_mode"] = state_params.get("show_mode", "ra")
         state_params["show_opts"] = state_params.get("show_opts", "soft_boot=yes")
 
         state_backend = BACKENDS[state_params["states"]]
@@ -260,25 +261,38 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
         #                       params_obj_name, state_params, None)
         state_object = env if params_obj_type == "nets" else vm
 
-        action_if_root_exists = state_params["show_mode"][0]
-        action_if_root_doesnt_exist = state_params["show_mode"][1]
+        action_if_exists = state_params["show_mode"][0]
+        action_if_doesnt_exist = state_params["show_mode"][1]
 
         # always check the corresponding root state as a prerequisite
         root_exists = state_backend.check_root(state_params, state_object)
         root_params = state_params.copy()
-        if not root_exists:
-            if action_if_root_doesnt_exist == "f":
-                root_params["pool_scope"] = "own"
-                state_backend.set_root(root_params, state_object)
-                root_exists = True
-            elif action_if_root_doesnt_exist == "r":
-                return []
-            else:
-                raise exceptions.TestError(
-                    f"Invalid policy {action_if_root_doesnt_exist}: The root "
-                    "nonexistence action can be either of 'reuse' or 'force'."
-                )
-        elif action_if_root_exists == "f":
+        if not root_exists and "a" == action_if_doesnt_exist:
+            raise exceptions.TestAbortError(
+                "Aborting because of unmet state management preconditions"
+            )
+        elif not root_exists and "i" == action_if_doesnt_exist:
+            logging.warning("No found states given no preconditions")
+            continue
+        elif not root_exists and "f" == action_if_doesnt_exist:
+            logging.info("Creating missing state management preconditions")
+            root_params["pool_scope"] = "own"
+            state_backend.set_root(root_params, state_object)
+            root_exists = True
+        elif not root_exists:
+            raise exceptions.TestError(
+                "Invalid policy %s: The action on unmet state management preconditions "
+                "can be either of 'abort', 'ignore', 'force'."
+                % state_params["show_mode"]
+            )
+        elif root_exists and "a" == action_if_exists:
+            raise exceptions.TestAbortError(
+                "Aborting because of unwanted state management preconditions"
+            )
+        elif root_exists and "r" == action_if_exists:
+            state_backend.get_root(root_params, state_object)
+        elif root_exists and "f" == action_if_exists:
+            logging.info("Recreating present state management preconditions")
             root_params["pool_scope"] = "own"
             # TODO: implement unset root for all parametric object types
             if params_obj_type == "nets/vms":
@@ -290,8 +304,12 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
                 state_backend.unset_root(root_params, state_object)
             state_backend.set_root(root_params, state_object)
             root_exists = True
-        else:
-            state_backend.get_root(root_params, state_object)
+        elif root_exists:
+            raise exceptions.TestError(
+                "Invalid policy %s: The action on met state management preconditions "
+                "can be either of 'abort', 'reuse', 'force'."
+                % state_params["show_mode"]
+            )
         states += ["root"] if root_exists else []
 
         logging.debug(
@@ -349,7 +367,7 @@ def get_states(run_params: Params, env: Env = None) -> None:
             continue
         else:
             state = state_params["get_state"]
-        state_params["get_mode"] = state_params.get("get_mode", "ra")
+        state_params["get_mode"] = state_params.get("get_mode", "rara")
 
         logging.info(f"Getting {params_obj_type} state {state} for {params_obj_name}")
         state_exists = _state_check_chain(
@@ -432,7 +450,7 @@ def set_states(run_params: Params, env: Env = None) -> None:
             continue
         else:
             state = state_params["set_state"]
-        state_params["set_mode"] = state_params.get("set_mode", "ff")
+        state_params["set_mode"] = state_params.get("set_mode", "ffrf")
 
         logging.info(f"Setting {params_obj_type} state {state} for {params_obj_name}")
         state_exists = _state_check_chain(
@@ -536,7 +554,7 @@ def unset_states(run_params: Params, env: Env = None) -> None:
             continue
         else:
             state = state_params["unset_state"]
-        state_params["unset_mode"] = state_params.get("unset_mode", "fi")
+        state_params["unset_mode"] = state_params.get("unset_mode", "firi")
 
         logging.info(f"Unsetting {params_obj_type} state {state} for {params_obj_name}")
         state_exists = _state_check_chain(
@@ -612,7 +630,7 @@ def push_states(run_params: Params, env: Env = None) -> None:
         state_params["states_chain"] = composite_types[-1]
 
         state_params["set_state"] = state_params["push_state"]
-        state_params["set_mode"] = state_params.get("push_mode", "af")
+        state_params["set_mode"] = state_params.get("push_mode", "afrf")
 
         set_states(state_params, env)
 
@@ -643,9 +661,9 @@ def pop_states(run_params: Params, env: Env = None) -> None:
         state_params["states_chain"] = composite_types[-1]
 
         state_params["get_state"] = state_params["pop_state"]
-        state_params["get_mode"] = state_params.get("pop_mode", "ra")
+        state_params["get_mode"] = state_params.get("pop_mode", "rara")
         get_states(state_params, env)
 
         state_params["unset_state"] = state_params["pop_state"]
-        state_params["unset_mode"] = state_params.get("pop_mode", "fa")
+        state_params["unset_mode"] = state_params.get("pop_mode", "fari")
         unset_states(state_params, env)
