@@ -46,7 +46,7 @@ class VMNetBackend(StateBackend):
 
         All arguments match the base class.
         """
-        return ["default"]
+        return ["root"]
 
     @classmethod
     def get(cls, params: Params, object: Any = None) -> None:
