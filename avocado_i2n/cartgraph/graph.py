@@ -1930,9 +1930,9 @@ class TestGraph(object):
         setup_dict.update(
             {
                 "type": "shared_configure_install",
-                "show_mode": "rr",  # explicit root handling
                 # overwrite some params inherited from the modified install node
-                f"set_state_images_{object_image}_{object_vm}": "root",
+                f"set_state_images_{object_image}_{object_vm}": "",
+                "show_mode": "rf",  # implicit root handling
                 "start_vm": "no",
             }
         )

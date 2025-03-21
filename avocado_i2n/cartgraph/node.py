@@ -1463,7 +1463,7 @@ class TestNode(Runnable):
                     )
                 object_params = dependency_object.object_typed_params(self.params)
                 # cloned nodes don't have an explicit get_state parameter for the object
-                if object_params["get_state"] == "root":
+                if object_params.get("get_state") is None:
                     continue
                 if object_state != object_params["get_state"]:
                     raise ValueError(
