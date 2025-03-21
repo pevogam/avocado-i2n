@@ -248,7 +248,7 @@ OPTIONS:
 [setup=setupchain]
 [only_vmX=vmvariant]
 [only=all|normal|minimal|...]
-[get|set|unset_mode=XX]
+[get|set|unset_mode=XXXX]
 ```
 
 The *setup* parameter will be used in the case of tool mode (manu plugin)
@@ -299,7 +299,8 @@ setup policy. The value consists of two lowercase letters, each dot is one
 of 'f' (force), 'i' (ignore), 'r' (reuse), 'a' (abort) and carries a special
 meaning according to its position - the first position determines the action
 of choice if the setup is present and the second if the setup is missing. Here
-is a brief description of each possible policies and action combinations:
+is a brief description of each possible policy and action combination (excluding
+the second two characters):
 
     ----------------------------------------
     -            - existing - non-existing -
@@ -339,6 +340,9 @@ is a brief description of each possible policies and action combinations:
             not there)
    - *.i* - Ignore if the state for cleanup is missing (cannot be removed
             since not there)
+
+The second two characters have similar semantics and are used for reusing or
+recreating the preconditions for the state get/set/unset operation.
 
 A combination of defaults for all three policies would reuse all setup left
 from previous runs determined by the set of tests you want to run. Automatic setup
