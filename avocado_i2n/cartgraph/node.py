@@ -1267,7 +1267,7 @@ class TestNode(Runnable):
                 door.run_subcontrol(session, mod_control_path)
                 should_run = False
             except ShellCmdError as error:
-                if "AssertionError" in error.output:
+                if "AssertionError" in error.output or "TestAbortError" in error.output:
                     should_run = True
                 else:
                     raise RuntimeError(
@@ -1294,7 +1294,7 @@ class TestNode(Runnable):
                 continue
 
             # avoid running any test unless the user really requires cleanup or setup is reusable
-            unset_policy = object_params.get("unset_mode", "ri")
+            unset_policy = object_params.get("unset_mode", "riri")
             if unset_policy[0] not in ["f", "r"]:
                 continue
             # avoid running any test for unselected vms
@@ -1347,7 +1347,9 @@ class TestNode(Runnable):
                     {
                         f"unset_state{suffixes}": object_state,
                         f"unset_location{suffixes}": location,
-                        f"unset_mode{suffixes}": object_params.get("unset_mode", "ri"),
+                        f"unset_mode{suffixes}": object_params.get(
+                            "unset_mode", "riri"
+                        ),
                         f"pool_scope": "own",
                     }
                 )

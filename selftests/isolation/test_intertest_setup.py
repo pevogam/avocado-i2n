@@ -384,8 +384,8 @@ class IntertestSetupTest(Test):
                 ]
                 for test_dict in DummyTestRun.asserted_tests:
                     test_dict[operation+"_state_images"] = "^root$"
-                    test_dict[operation+"_mode_images"] = "^af$" if operation == "set" else "^fa$"
-                    test_dict[operation+"_mode_images"] = "^ii$" if operation == "get" else test_dict[operation+"_mode_images"]
+                    test_dict[operation+"_mode_images"] = "^afri$" if operation == "set" else "^farf$"
+                    test_dict[operation+"_mode_images"] = "^iiri$" if operation == "get" else test_dict[operation+"_mode_images"]
                 setup_func = getattr(intertest_setup, state_action)
                 setup_func(self.config, "5m")
                 self.assertEqual(len(DummyTestRun.asserted_tests), 0, "Some tests weren't run: %s" % DummyTestRun.asserted_tests)
