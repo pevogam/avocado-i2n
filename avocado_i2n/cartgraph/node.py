@@ -385,7 +385,7 @@ class TestNode(Runnable):
 
         self.prefix = prefix
         self.recipe = recipe
-        self._params_cache = None
+        self._params_cache: Params = None
         self.restrs = {}
 
         self.should_run = self.default_run_decision
@@ -1201,12 +1201,17 @@ class TestNode(Runnable):
         :param bool verbose: whether to show generated parameter dictionaries
         """
         self._params_cache = self.recipe.get_params(show_dictionaries=verbose)
-        for key, value in list(self._params_cache.items()):
-            if key.startswith("only_") or key.startswith("no_"):
-                restr_type, suffix = key.split("_", maxsplit=1)
-                restr_line = restr_type + " " + value + "\n" if value != "" else ""
-                self.update_restrs({suffix: restr_line})
-                del self._params_cache[key]
+        keys = [
+            k
+            for k in self._params_cache
+            if k.startswith("only_") or k.startswith("no_")
+        ]
+        for key in sorted(keys, reverse=True):
+            value = self._params_cache[key]
+            restr_type, suffix = key.split("_", maxsplit=1)
+            restr_line = restr_type + " " + value + "\n" if value != "" else ""
+            self.update_restrs({suffix: restr_line})
+            del self._params_cache[key]
         self.regenerate_vt_parameters()
 
     def regenerate_vt_parameters(self) -> None:

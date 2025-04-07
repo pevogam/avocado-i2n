@@ -243,8 +243,7 @@ class CartesianObjectTest(Test):
     def test_parse_composite_objects_net_unrestricted(self):
         """Test for a correctly parsed net object from empty joined vm string restrictions."""
         test_objects = TestGraph.parse_composite_objects("net1", "nets", "")
-        # TODO: bug in the Cartesian parser, they must be 6!
-        self.assertEqual(len(test_objects), 4)
+        self.assertEqual(len(test_objects), 8)
         for i, test_object in enumerate(test_objects):
             self.assertEqual(test_object.dict_index, i)
 

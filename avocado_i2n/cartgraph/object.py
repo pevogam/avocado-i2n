@@ -70,7 +70,7 @@ class TestObject(object):
         self.suffix = suffix.split("_")[0]
         self._long_suffix = suffix
         self.recipe = recipe
-        self._params_cache = None
+        self._params_cache: Params = None
         self.restrs = {}
         # TODO: Cartesian parser needs support for restrictions after join operations
         self.dict_index = 0
@@ -138,12 +138,17 @@ class TestObject(object):
             dict_index=self.dict_index, show_dictionaries=verbose
         )
         self._params_cache = self.object_typed_params(generic_params)
-        for key, value in list(self._params_cache.items()):
-            if key.startswith("only_") or key.startswith("no_"):
-                restr_type, suffix = key.split("_", maxsplit=1)
-                restr_line = restr_type + " " + value + "\n" if value != "" else ""
-                self.update_restrs({suffix: restr_line})
-                del self._params_cache[key]
+        keys = [
+            k
+            for k in self._params_cache
+            if k.startswith("only_") or k.startswith("no_")
+        ]
+        for key in sorted(keys, reverse=True):
+            value = self._params_cache[key]
+            restr_type, suffix = key.split("_", maxsplit=1)
+            restr_line = restr_type + " " + value + "\n" if value != "" else ""
+            self.update_restrs({suffix: restr_line})
+            del self._params_cache[key]
 
 
 class NetObject(TestObject):
