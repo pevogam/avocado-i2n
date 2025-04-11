@@ -462,6 +462,12 @@ class QCOW2VTBackend(QCOW2Backend):
         """
         vm, vm_name = object, params["vms"]
         logging.info("Reusing vm state '%s' of %s", params["get_state"], vm_name)
+
+        if vm is None:
+            raise ValueError("Need an environmental object to boot")
+        if not vm.is_alive():
+            vm.create()
+
         vm.pause()
         vm.loadvm(params["get_state"])
         vm.resume(timeout=3)
@@ -475,6 +481,10 @@ class QCOW2VTBackend(QCOW2Backend):
         """
         vm, vm_name = object, params["vms"]
         logging.info("Setting vm state '%s' of %s", params["set_state"], vm_name)
+
+        if vm is None or not vm.is_alive():
+            raise RuntimeError("No booted vm and thus vm state to set")
+
         vm.pause()
         vm.savevm(params["set_state"])
         vm.resume(timeout=3)
@@ -488,6 +498,10 @@ class QCOW2VTBackend(QCOW2Backend):
         """
         vm, vm_name = object, params["vms"]
         logging.info("Removing vm state '%s' of %s", params["unset_state"], vm_name)
+
+        if vm is None or not vm.is_alive():
+            raise RuntimeError("No booted vm and thus vm state to unset")
+
         vm.pause()
         # NOTE: this was supposed to be implemented in the Qemu VM object but
         # it is not unlike savevm and loadvm, perhaps due to command availability
@@ -506,7 +520,6 @@ class QCOW2VTBackend(QCOW2Backend):
         """
         vm_name = params["vms"]
         logging.debug("Checking whether %s's root state is fully available", vm_name)
-
         for image_name in params.objects("images"):
             image_params = params.object_params(image_name)
             image_path = image_params["image_name"]
@@ -521,17 +534,7 @@ class QCOW2VTBackend(QCOW2Backend):
                     image_path + image_format,
                 )
                 return False
-
-        if not params.get_boolean("use_env", True):
-            return True
-        logging.debug("Checking whether %s is on (boot state requested)", vm_name)
-        vm = object
-        if vm is not None and vm.is_alive():
-            logging.info("The required virtual machine %s is on", vm_name)
-            return True
-        else:
-            logging.info("The required virtual machine %s is off", vm_name)
-            return False
+        return True
 
     @classmethod
     def _set_root(cls, params: Params, object: Any = None) -> None:
@@ -564,17 +567,6 @@ class QCOW2VTBackend(QCOW2Backend):
                 )
                 env_process.preprocess_image(None, image_params, image_path)
 
-        if not params.get_boolean("use_env", True):
-            return
-        logging.info("Booting %s to provide boot state", vm_name)
-        vm = object
-        if vm is None:
-            raise ValueError("Need an environmental object to boot")
-            # vm = env.create_vm(params.get('vm_type'), params.get('target'),
-            #                   vm_name, params, None)
-        if not vm.is_alive():
-            vm.create()
-
     @classmethod
     def _unset_root(cls, params: Params, object: Any = None) -> None:
         """
@@ -583,10 +575,23 @@ class QCOW2VTBackend(QCOW2Backend):
         All arguments match the base class.
         """
         vm_name = params["vms"]
-        logging.info("Shutting down %s to prevent boot state", vm_name)
-        vm = object
-        if vm is not None and vm.is_alive():
-            vm.destroy(gracefully=False)
+
+        for image_name in params.objects("images"):
+            image_params = params.object_params(image_name)
+            image_path = image_params["image_name"]
+            if not os.path.isabs(image_path):
+                image_path = os.path.join(image_params["images_base_dir"], image_path)
+            image_format = image_params.get("image_format")
+            image_format = "" if image_format in ["raw", ""] else "." + image_format
+            if os.path.exists(image_path + image_format):
+                logging.info(
+                    "Removing image %s in order to remove all vm states of %s",
+                    image_path + image_format,
+                    vm_name,
+                )
+                os.makedirs(os.path.dirname(image_path), exist_ok=True)
+                image_params.update({"remove_image": "yes"})
+                env_process.postprocess_image(None, image_params, image_path)
 
 
 def get_image_path(params: Params) -> str:
