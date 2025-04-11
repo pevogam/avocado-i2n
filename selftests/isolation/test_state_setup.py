@@ -69,8 +69,7 @@ class MockDriver(unittest.TestCase):
                 self.mock_vms["vm1"].is_alive.return_value = False
                 self.exist_switch = root_exists
             elif backend == "qcow2vt":
-                self.exist_switch = True
-                self.mock_vms["vm1"].is_alive.return_value = root_exists
+                self.exist_switch = root_exists
             output = ""
             for state in state_names:
                 size = "0 B" if state_type == "image" else "1 GiB"
@@ -639,26 +638,28 @@ class StatesBoundaryTest(Test):
         """Test that root checking with the QCOW2VT backend works."""
         backend = "qcow2vt"
         backend_type = self._prepare_driver_from_backend(backend)
+        # test for two images rather than one
+        self.run_params["images_vm1"] = "image1 image2"
+        self.run_params["image_name_image1_vm1"] = "vm1/image1"
+        self.run_params["image_name_image2_vm1"] = "vm1/image2"
         # keep a passive precondition behavior for this test
         self.run_params["show_mode"] = "ri"
 
         # assert root state is correctly detected
         with self.driver.mock_show([], backend_type, True) as driver:
             states = ss.show_states(self.run_params, self.env)
-            self.mock_vms["vm1"].is_alive.assert_called_once_with()
         self.assertEqual(states, ["root"])
 
         # assert root state is correctly not detected
         with self.driver.mock_show([], backend_type, False) as driver:
             states = ss.show_states(self.run_params, self.env)
-            self.mock_vms["vm1"].is_alive.assert_called_once_with()
         self.assertEqual(states, [])
 
     def test_check_root_vm_ramfile(self):
         """Test that root checking with the ramfile backend works."""
         backend = "ramfile"
         backend_type = self._prepare_driver_from_backend(backend)
-        # bonus: test for two images rather than one
+        # test for two images rather than one
         self.run_params["images_vm1"] = "image1 image2"
         self.run_params["image_name_image1_vm1"] = "vm1/image1"
         self.run_params["image_name_image2_vm1"] = "vm1/image2"
@@ -688,7 +689,7 @@ class StatesBoundaryTest(Test):
                 # TODO: not fully isolated backends
                 if backend in ["qcow2ext"]:
                     continue
-                # TODO: net-based not fulyl isolated backends
+                # TODO: net-based not fully isolated backends
                 if backend in ["lxc", "btrfs", "vmnet"]:
                     continue
                 backend_type = self._prepare_driver_from_backend(backend)
@@ -793,9 +794,8 @@ class StatesBoundaryTest(Test):
             self.mock_vms["vm1"].destroy.assert_called_once_with(gracefully=True)
         mock_env_process.preprocess_image.assert_not_called()
 
-    @mock.patch('avocado_i2n.states.ramfile.env_process')
     @mock.patch('avocado_i2n.states.qcow2.env_process')
-    def test_set_root_vm(self, _mock_env1, _mock_env2):
+    def test_set_root_vm(self, mock_env):
         """Test that root setting with a vm state backend works."""
         # keep a passive precondition behavior for this test
         self.run_params["set_mode"] = "ffri"
@@ -805,23 +805,21 @@ class StatesBoundaryTest(Test):
                 backend_type = self._prepare_driver_from_backend(backend)
                 self.run_params[f"set_state_{backend_type}s_vm1"] = "root"
 
-                # TODO: there are now way too many conditions in each root state and only
-                # some of them are mocked for this test to have a proper coverage and definitions
-
                 # assert root state is not detected and created
                 with self.driver.mock_show([], backend_type, False) as driver:
                     ss.set_states(self.run_params, self.env)
                     if backend == "qcow2vt":
-                        self.mock_vms["vm1"].create.assert_called_once_with()
+                        mock_env.preprocess_image.assert_called_once()
                     elif backend == "ramfile":
-                        driver.makedirs.assert_called_once_with("/images/vm1-abc.def", exist_ok=True)
+                        driver.makedirs.assert_any_call("/images/vm1-abc.def", exist_ok=True)
+                        mock_env.preprocess_image.assert_called_once()
 
-                # assert root state is detected and but not overwritten in this case
+                # assert root state is detected and overwritten in this case
                 with self.driver.mock_show([], backend_type, True) as driver:
                     ss.set_states(self.run_params, self.env)
-                    self.mock_vms["vm1"].create.assert_not_called()
                     if backend == "ramfile":
                         driver.makedirs.assert_called_once_with("/images/vm1-abc.def", exist_ok=True)
+                    mock_env.preprocess_image.assert_called_once()
 
     @mock.patch('avocado_i2n.states.lvm.vg_cleanup')
     def test_unset_root_image_lvm(self, mock_vg_cleanup):
@@ -872,7 +870,8 @@ class StatesBoundaryTest(Test):
         #self.mock_vms["vm1"].destroy.assert_called_once_with(gracefully=False)
         pass
 
-    def test_unset_root_vm(self):
+    @mock.patch('avocado_i2n.states.qcow2.env_process')
+    def test_unset_root_vm(self, mock_env_process):
         """Test that root unsetting with a vm state backend works."""
         for backend in ["qcow2vt", "ramfile"]:
             with self.subTest(f"Testing unset root for backend {backend}"):
@@ -882,7 +881,7 @@ class StatesBoundaryTest(Test):
                 # assert root state is detected and removed
                 with self.driver.mock_show([], backend_type, True) as driver:
                     ss.unset_states(self.run_params, self.env)
-                    self.mock_vms["vm1"].destroy.assert_called_once_with(gracefully=False)
+                    mock_env_process.postprocess_image.assert_called_once()
 
     def test_qcow2_dash(self):
         """Test the special character support for the QCOW2 backends."""
