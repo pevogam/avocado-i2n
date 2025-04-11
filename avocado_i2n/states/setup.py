@@ -197,14 +197,9 @@ def _state_check_chain(
     """
     state_params["show_state"] = state_params[f"{do}_state"]
     state_params["show_mode"] = state_params[f"{do}_mode"][2:]
+    state_params["show_switch"] = state_params[f"{do}_switch"]
     if state_params.get(f"{do}_location"):
         state_params["show_location"] = state_params[f"{do}_location"]
-    if do == "set":
-        state_params["show_opts"] = "soft_boot=yes"
-        state_params["soft_boot"] = "yes"
-    else:
-        state_params["show_opts"] = "soft_boot=no"
-        state_params["soft_boot"] = "no"
 
     # restrict inner call parameteric object types and names
     composite_types = params_obj_type.split("/")
@@ -250,7 +245,6 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
             state = "^" + state_params["show_state"] + "$"
         # TODO: document after experimental period or rather refactor
         state_params["show_mode"] = state_params.get("show_mode", "ra")
-        state_params["show_opts"] = state_params.get("show_opts", "soft_boot=yes")
 
         state_backend = BACKENDS[state_params["states"]]
         # TODO: we don't support other parametric object instances
@@ -296,10 +290,7 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
             root_params["pool_scope"] = "own"
             # TODO: implement unset root for all parametric object types
             if params_obj_type == "nets/vms":
-                vm.destroy(
-                    gracefully=root_params.get_dict("show_opts").get("soft_boot", "yes")
-                    == "yes"
-                )
+                vm.destroy(gracefully=root_params.get("show_switch", "soft") == "soft")
             else:
                 state_backend.unset_root(root_params, state_object)
             state_backend.set_root(root_params, state_object)
@@ -368,6 +359,7 @@ def get_states(run_params: Params, env: Env = None) -> None:
         else:
             state = state_params["get_state"]
         state_params["get_mode"] = state_params.get("get_mode", "rara")
+        state_params["get_switch"] = state_params.get("get_switch", "hard")
 
         logging.info(f"Getting {params_obj_type} state {state} for {params_obj_name}")
         state_exists = _state_check_chain(
@@ -451,6 +443,7 @@ def set_states(run_params: Params, env: Env = None) -> None:
         else:
             state = state_params["set_state"]
         state_params["set_mode"] = state_params.get("set_mode", "ffrf")
+        state_params["set_switch"] = state_params.get("set_switch", "soft")
 
         logging.info(f"Setting {params_obj_type} state {state} for {params_obj_name}")
         state_exists = _state_check_chain(
@@ -555,6 +548,7 @@ def unset_states(run_params: Params, env: Env = None) -> None:
         else:
             state = state_params["unset_state"]
         state_params["unset_mode"] = state_params.get("unset_mode", "firi")
+        state_params["unset_switch"] = state_params.get("unset_switch", "hard")
 
         logging.info(f"Unsetting {params_obj_type} state {state} for {params_obj_name}")
         state_exists = _state_check_chain(

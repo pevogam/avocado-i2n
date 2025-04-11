@@ -770,10 +770,7 @@ class RootSourcedStateBackend(StateBackend):
         if params["pool_scope"] == "own":
             return local_root_exists
         pool_root_exists = cls.transport.check_root(params, object)
-        # TODO: boot state has to be deprecated and it cannot be handled remotely
-        return local_root_exists or (
-            pool_root_exists and params["object_type"] not in ["vms", "nets/vms"]
-        )
+        return local_root_exists or pool_root_exists
 
     @classmethod
     def get_root(cls, params: Params, object: Any = None) -> None:

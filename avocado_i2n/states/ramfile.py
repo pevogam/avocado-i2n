@@ -94,12 +94,17 @@ class RamfileBackend(SourcedStateBackend):
         """
         vm, vm_name = object, params["vms"]
         logging.info("Reusing vm state '%s' of %s", params["get_state"], vm_name)
-        vm.destroy(gracefully=False)
+
+        if vm is None:
+            raise ValueError("Need an environmental object to restore from file")
+        if vm.is_alive():
+            vm.destroy(gracefully=False)
 
         for image_name in params.objects("images"):
             image_params = params.object_params(image_name)
             # TODO: refine method arguments by providing at least the image name directly
             image_params["images"] = image_name
+            image_params["get_switch"] = "none"
             cls.image_state_backend.get(image_params, vm)
 
         state_dir = params["swarm_pool"]
@@ -117,6 +122,10 @@ class RamfileBackend(SourcedStateBackend):
         """
         vm, vm_name = object, params["vms"]
         logging.info("Setting vm state '%s' of %s", params["set_state"], vm_name)
+
+        if vm is None or not vm.is_alive():
+            raise RuntimeError("No booted vm and thus vm state to set")
+
         vm.pause()
 
         state_dir = params["swarm_pool"]
@@ -131,6 +140,7 @@ class RamfileBackend(SourcedStateBackend):
             image_params = params.object_params(image_name)
             # TODO: refine method arguments by providing at least the image name directly
             image_params["images"] = image_name
+            image_params["set_switch"] = "none"
             cls.image_state_backend.set(image_params, vm)
 
         # BUG: because the built-in functionality uses system_reset
@@ -148,16 +158,12 @@ class RamfileBackend(SourcedStateBackend):
         """
         vm, vm_name = object, params["vms"]
         logging.info("Removing vm state '%s' of %s", params["unset_state"], vm_name)
-        # TODO: such switch is not allowed within the state backend, has to be handled on more globally:
-        # this is entirely commented so that the "remove previous state" on overwriting doesn't turn off the vm
-        # making it impossible to save a state on off-vm
-        # if vm is not None:
-        #    vm.destroy(gracefully=False)
 
         for image_name in params.objects("images"):
             image_params = params.object_params(image_name)
             # TODO: refine method arguments by providing at least the image name directly
             image_params["images"] = image_name
+            image_params["unset_switch"] = "none"
             cls.image_state_backend.unset(image_params, vm)
 
         state_dir = params["swarm_pool"]
@@ -183,32 +189,11 @@ class RamfileBackend(SourcedStateBackend):
             )
             return False
 
-        # we cannot use local image backend because root conditions here require running vm
         for image_name in params.objects("images"):
             image_params = params.object_params(image_name)
-            image_path = image_params["image_name"]
-            if not os.path.isabs(image_path):
-                image_path = os.path.join(image_params["images_base_dir"], image_path)
-            image_format = image_params.get("image_format", "qcow2")
-            image_format = "" if image_format in ["raw", ""] else "." + image_format
-            if not os.path.exists(image_path + image_format):
-                logging.info(
-                    "The required virtual machine %s has a missing image %s",
-                    vm_name,
-                    image_path + image_format,
-                )
+            if not RamfileBackend.image_state_backend.check_root(image_params):
                 return False
-
-        if not params.get_boolean("use_env", True):
-            return True
-        logging.debug("Checking whether %s is on (boot state requested)", vm_name)
-        vm = object
-        if vm is not None and vm.is_alive():
-            logging.info("The required virtual machine %s is on", vm_name)
-            return True
-        else:
-            logging.info("The required virtual machine %s is off", vm_name)
-            return False
+        return True
 
     @classmethod
     def set_root(cls, params: Params, object: Any = None) -> None:
@@ -216,59 +201,18 @@ class RamfileBackend(SourcedStateBackend):
         Set a root state to provide running object.
 
         All arguments match the base class.
-
-        ..todo:: The following is too complex and setting a root has gradually grown to
-                 require setting too many separate conditions, some of which might already
-                 be set, some are forced to be redone, and only some are mocked and thus
-                 checked. We need root state consiredations and refactoring to simplify
-                 this and improve the corresponding test definitions / contracts.
-
-        ..todo:: Once the previous todo is achieved it is possible that the logic here
-                 also simplifies so that we don't have to worry about creating blank
-                 images on top of good ones obtained via the image backend or not creating
-                 images that are in fact missing or could be corrupted via modified backing
-                 chains of dependencies.
         """
         vm_name = params["vms"]
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, params["object_id"])
         os.makedirs(vm_dir, exist_ok=True)
 
-        if not params.get_boolean("use_env", True):
-            return
-
-        vm = object
-        logging.info("Booting %s to provide boot state", vm_name)
-        if vm is None:
-            raise ValueError("Need an environmental object to boot")
-            # vm = env.create_vm(params.get('vm_type'), params.get('target'),
-            #                   vm_name, params, None)
-        if not vm.is_alive():
-            try:
-                vm.create()
-            except VMCreateError as error:
-                for image_name in params.objects("images"):
-                    image_params = params.object_params(image_name)
-                    image_path = image_params["image_name"]
-                    if not os.path.isabs(image_path):
-                        image_path = os.path.join(
-                            image_params["images_base_dir"], image_path
-                        )
-                    image_format = image_params.get("image_format")
-                    image_format = (
-                        "" if image_format in ["raw", ""] else "." + image_format
-                    )
-                    logging.info(
-                        "Creating image %s in order to boot %s",
-                        image_path + image_format,
-                        vm_name,
-                    )
-                    os.makedirs(os.path.dirname(image_path), exist_ok=True)
-                    image_params.update(
-                        {"create_image": "yes", "force_create_image": "yes"}
-                    )
-                    env_process.preprocess_image(None, image_params, image_path)
-                vm.create()
+        for image_name in params.objects("images"):
+            logging.info(
+                f"Creating image {image_name} in order to boot {vm_name}",
+            )
+            image_params = params.object_params(image_name)
+            RamfileBackend.image_state_backend.set_root(image_params)
 
     @classmethod
     def unset_root(cls, params: Params, object: Any = None) -> None:
@@ -278,7 +222,9 @@ class RamfileBackend(SourcedStateBackend):
         All arguments match the base class.
         """
         vm_name = params["vms"]
-        logging.info("Shutting down %s to prevent boot state", vm_name)
-        vm = object
-        if vm is not None and vm.is_alive():
-            vm.destroy(gracefully=False)
+        for image_name in params.objects("images"):
+            logging.info(
+                f"Remove image {image_name} in order to remove all vm states of {vm_name}",
+            )
+            image_params = params.object_params(image_name)
+            RamfileBackend.image_state_backend.unset_root(image_params)

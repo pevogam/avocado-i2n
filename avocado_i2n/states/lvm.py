@@ -68,6 +68,52 @@ class LVMBackend(StateBackend):
             return params["images_base_dir"]
 
     @classmethod
+    def switch_off(cls, mode: str, object: Any = None) -> None:
+        """
+        Switch vm or other object off if a non-running object is required.
+
+        :param mode: how to switch off - "soft", "hard", or "none"
+        :param object: the object to switch off
+        """
+        if mode not in ["soft", "hard", "none"]:
+            raise ValueError(
+                f"Invalid switch mode {mode} - must be soft, hard, or none"
+            )
+
+        vm = object
+        if vm is None or not vm.is_alive():
+            logging.warning("Will not switch off vm that is not available or alive")
+            return
+        if mode == "none":
+            raise RuntimeError("The vm is alive and it shouldn't be")
+
+        logging.info("The vm %s is running, switching it off", vm.name)
+        vm.destroy(gracefully=mode == "soft")
+
+    @classmethod
+    def switch_on(cls, mode: str, object: Any = None) -> None:
+        """
+        Switch vm or other object on if a non-running object is required.
+
+        :param mode: how to switch off - "soft", "hard", or "none"
+        :param object: the object to switch on
+        """
+        if mode not in ["soft", "hard", "none"]:
+            raise ValueError(
+                f"Invalid switch mode {mode} - must be soft, hard, or none"
+            )
+
+        vm = object
+        if mode == "none":
+            return
+        if vm is None or vm.is_alive():
+            logging.warning("Will not switch on vm that is not available or alive")
+            return
+
+        logging.info("Starting the vm %s after image state operation", vm.name)
+        vm.create()
+
+    @classmethod
     def show(cls, params: Params, object: Any = None) -> list[str]:
         """
         Return a list of available states of a specific type.
@@ -83,9 +129,14 @@ class LVMBackend(StateBackend):
 
         All arguments match the base class.
         """
-        vm_name = params["vms"]
+        vm_name, vm = params["vms"], object
+        state, switch = params["get_state"], params["get_switch"]
+        logging.info("Restoring %s to state %s", vm_name, state)
+
+        cls.switch_off(switch, vm)
+
         mount_loc = cls._get_image_mount_loc(params)
-        params["lv_snapshot_name"] = params["get_state"]
+        params["lv_snapshot_name"] = state
         if mount_loc:
             # mount to avoid not-mounted errors
             try:
@@ -96,7 +147,6 @@ class LVMBackend(StateBackend):
                 pass
             lv_utils.lv_umount(params["vg_name"], params["lv_pointer_name"])
         try:
-            logging.info("Restoring %s to state %s", vm_name, params["get_state"])
             lv_utils.lv_remove(params["vg_name"], params["lv_pointer_name"])
             lv_utils.lv_take_snapshot(
                 params["vg_name"], params["lv_snapshot_name"], params["lv_pointer_name"]
@@ -107,6 +157,8 @@ class LVMBackend(StateBackend):
                     params["vg_name"], params["lv_pointer_name"], mount_loc
                 )
 
+        cls.switch_on(switch, vm)
+
     @classmethod
     def set(cls, params: Params, object: Any = None) -> None:
         """
@@ -114,12 +166,18 @@ class LVMBackend(StateBackend):
 
         All arguments match the base class.
         """
-        vm_name = params["vms"]
-        params["lv_snapshot_name"] = params["set_state"]
-        logging.info("Taking a snapshot '%s' of %s", params["set_state"], vm_name)
+        vm_name, vm = params["vms"], object
+        state, switch = params["set_state"], params["set_switch"]
+        logging.info("Taking a snapshot '%s' of %s", state, vm_name)
+
+        cls.switch_off(switch, vm)
+
+        params["lv_snapshot_name"] = state
         lv_utils.lv_take_snapshot(
             params["vg_name"], params["lv_pointer_name"], params["lv_snapshot_name"]
         )
+
+        cls.switch_on(switch, vm)
 
     @classmethod
     def unset(cls, params: Params, object: Any = None) -> None:
@@ -130,13 +188,19 @@ class LVMBackend(StateBackend):
 
         :raises: :py:class:`ValueError` if LV pointer state was used
         """
-        vm_name = params["vms"]
+        vm_name, vm = params["vms"], object
+        state, switch = params["unset_state"], params["unset_switch"]
+        logging.info("Removing snapshot %s of %s", state, vm_name)
+
+        cls.switch_off(switch, vm)
+
+        params["lv_snapshot_name"] = state
         lv_pointer = params["lv_pointer_name"]
-        if params["unset_state"] == lv_pointer:
+        if state == lv_pointer:
             raise ValueError("Cannot unset built-in state '%s'" % lv_pointer)
-        params["lv_snapshot_name"] = params["unset_state"]
-        logging.info("Removing snapshot %s of %s", params["lv_snapshot_name"], vm_name)
         lv_utils.lv_remove(params["vg_name"], params["lv_snapshot_name"])
+
+        cls.switch_on(switch, vm)
 
     @classmethod
     def check_root(cls, params: Params, object: Any = None) -> bool:
@@ -147,7 +211,7 @@ class LVMBackend(StateBackend):
         """
         vm_name = params["vms"]
         image_name = params["image_name"]
-        logging.debug("Checking whether %s exists (root state requested)", vm_name)
+        logging.debug("Checking whether %s's %s exists", vm_name, image_name)
         if lv_utils.lv_check(params["vg_name"], params["lv_name"]):
             logging.info(
                 "The required virtual machine %s's %s (%s) exists",
@@ -207,7 +271,7 @@ class LVMBackend(StateBackend):
                 create_filesystem="ext4",
             )
             # TODO: it is not correct for the LVM backend to expect QCOW2 images
-            # but at the moment we have no better way to provide on states with
+            # but at the moment we have no better way to provide vm states with
             # base image to take snapshots of
             if object is not None and object.is_alive():
                 object.destroy(gracefully=params.get_boolean("soft_boot", True))
