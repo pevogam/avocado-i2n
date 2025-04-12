@@ -131,7 +131,17 @@ class VMNetwork(object):
                     "/tmp",
                 )
             else:
+                # TODO: there is a circular dependence here whereby the vmnet will
+                # create vms with not yet ready parameters (early env process hook)
+                # because it needs the vm objects (not started since no bridges) to
+                # create bridges while at the same time vms need existing bridges
+                # as netdst and thus the vmnet state in order to be bootable -
+                # create vmnet via vmnet state backend at late preprocessing hook
+                # in order to get the preprocessing ready vm parameters here and
+                # just move back to overwriting the vm.params via vm_params
+                cpu_model = vm.params.get("cpu_model", "SandyBridge")
                 vm.params = vm_params
+                vm.params["cpu_model"] = cpu_model
 
             self.nodes[vm_name] = self.new_node(vm)
             self.integrate_node(self.nodes[vm_name])
