@@ -270,21 +270,6 @@ class LVMBackend(StateBackend):
                 mount_loc,
                 create_filesystem="ext4",
             )
-            # TODO: it is not correct for the LVM backend to expect QCOW2 images
-            # but at the moment we have no better way to provide vm states with
-            # base image to take snapshots of
-            if object is not None and object.is_alive():
-                object.destroy(gracefully=params.get_boolean("soft_boot", True))
-            image_path = params["image_name"]
-            if not os.path.isabs(image_path):
-                image_path = os.path.join(params["images_base_dir"], image_path)
-            image_format = params.get("image_format")
-            image_format = "" if image_format in ["raw", ""] else "." + image_format
-            if not os.path.exists(image_path + image_format):
-                os.makedirs(os.path.dirname(image_path), exist_ok=True)
-                logging.info("Creating image %s for %s", image_path, vm_name)
-                params.update({"create_image": "yes", "force_create_image": "yes"})
-                env_process.preprocess_image(None, params, image_path)
 
     @classmethod
     def unset_root(cls, params: Params, object: Any = None) -> None:
