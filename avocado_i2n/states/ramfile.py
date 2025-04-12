@@ -93,6 +93,11 @@ class RamfileBackend(SourcedStateBackend):
         All arguments match the base class.
         """
         vm, vm_name = object, params["vms"]
+        # TODO: after supposedly unrelated ramfile changes the CPU model
+        # now constantly switches
+        logging.critical(vm.params.get("auto_cpu_model"))
+        logging.critical(vm.params.get("cpu_model"))
+        vm.params["cpu_model"] = "EPYC-v4"
         logging.info("Reusing vm state '%s' of %s", params["get_state"], vm_name)
 
         if vm is None:
