@@ -171,7 +171,7 @@ class RamfileBackend(SourcedStateBackend):
         os.unlink(state_file)
 
     @classmethod
-    def check_root(cls, params: Params, object: Any = None) -> bool:
+    def check(cls, params: Params, object: Any = None) -> bool:
         """
         Check whether a root state or essentially the object is running.
 
@@ -190,12 +190,12 @@ class RamfileBackend(SourcedStateBackend):
 
         for image_name in params.objects("images"):
             image_params = params.object_params(image_name)
-            if not RamfileBackend.image_state_backend.check_root(image_params):
+            if not RamfileBackend.image_state_backend.check(image_params):
                 return False
         return True
 
     @classmethod
-    def set_root(cls, params: Params, object: Any = None) -> None:
+    def initialize(cls, params: Params, object: Any = None) -> None:
         """
         Set a root state to provide running object.
 
@@ -211,10 +211,10 @@ class RamfileBackend(SourcedStateBackend):
                 f"Creating image {image_name} in order to boot {vm_name}",
             )
             image_params = params.object_params(image_name)
-            RamfileBackend.image_state_backend.set_root(image_params)
+            RamfileBackend.image_state_backend.initialize(image_params)
 
     @classmethod
-    def unset_root(cls, params: Params, object: Any = None) -> None:
+    def finalize(cls, params: Params, object: Any = None) -> None:
         """
         Unset a root state to prevent object from running.
 
@@ -226,4 +226,4 @@ class RamfileBackend(SourcedStateBackend):
                 f"Remove image {image_name} in order to remove all vm states of {vm_name}",
             )
             image_params = params.object_params(image_name)
-            RamfileBackend.image_state_backend.unset_root(image_params)
+            RamfileBackend.image_state_backend.finalize(image_params)

@@ -73,7 +73,7 @@ class LXCBackend(StateBackend):
         raise NotImplementedError("Implement LXC states based on demand.")
 
     @classmethod
-    def check_root(cls, params: Params, object: Any = None) -> None:
+    def check(cls, params: Params, object: Any = None) -> None:
         """
         Check whether a root state or essentially the object exists.
 
@@ -82,7 +82,7 @@ class LXCBackend(StateBackend):
         raise NotImplementedError("Implement LXC states based on demand.")
 
     @classmethod
-    def set_root(cls, params: Params, object: Any = None) -> None:
+    def initialize(cls, params: Params, object: Any = None) -> None:
         """
         Set a root state to provide object existence.
 
@@ -91,7 +91,7 @@ class LXCBackend(StateBackend):
         raise NotImplementedError("Implement LXC states based on demand.")
 
     @classmethod
-    def unset_root(cls, params: Params, object: Any = None) -> None:
+    def finalize(cls, params: Params, object: Any = None) -> None:
         """
         Unset a root state to prevent object existence.
 

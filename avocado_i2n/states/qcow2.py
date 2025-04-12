@@ -213,7 +213,7 @@ class QCOW2Backend(RootSourcedStateBackend):
         cls.switch_on(switch, vm)
 
     @classmethod
-    def _check_root(cls, params: Params, object: Any = None) -> bool:
+    def _check(cls, params: Params, object: Any = None) -> bool:
         """
         Check whether a root state or essentially the object exists locally.
 
@@ -245,16 +245,7 @@ class QCOW2Backend(RootSourcedStateBackend):
             return False
 
     @classmethod
-    def _get_root(cls, params: Params, object: Any = None) -> None:
-        """
-        Get a root state or essentially due to pre-existence do nothing.
-
-        All arguments match the base class.
-        """
-        pass
-
-    @classmethod
-    def _set_root(cls, params: Params, object: Any = None) -> None:
+    def _initialize(cls, params: Params, object: Any = None) -> None:
         """
         Set a root state to provide object existence.
 
@@ -275,7 +266,7 @@ class QCOW2Backend(RootSourcedStateBackend):
             env_process.preprocess_image(None, params, image_name)
 
     @classmethod
-    def _unset_root(cls, params: Params, object: Any = None) -> None:
+    def _finalize(cls, params: Params, object: Any = None) -> None:
         """
         Unset a root state to prevent object existence.
 
@@ -461,40 +452,31 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
         cls.switch_on(switch, vm)
 
     @classmethod
-    def check_root(cls, params: Params, object: Any = None) -> bool:
+    def check(cls, params: Params, object: Any = None) -> bool:
         """
         Check whether a root state or essentially the object exists locally.
 
         All arguments match the base class.
         """
-        return QCOW2Backend._check_root(params, object)
+        return QCOW2Backend._check(params, object)
 
     @classmethod
-    def get_root(cls, params: Params, object: Any = None) -> None:
-        """
-        Get a root state or essentially due to pre-existence do nothing.
-
-        All arguments match the base class.
-        """
-        QCOW2Backend._get_root(params, object)
-
-    @classmethod
-    def set_root(cls, params: Params, object: Any = None) -> None:
+    def initialize(cls, params: Params, object: Any = None) -> None:
         """
         Set a root state to provide object existence.
 
         All arguments match the base class.
         """
-        QCOW2Backend._set_root(params, object)
+        QCOW2Backend._initialize(params, object)
 
     @classmethod
-    def unset_root(cls, params: Params, object: Any = None) -> None:
+    def finalize(cls, params: Params, object: Any = None) -> None:
         """
         Unset a root state to prevent object existence.
 
         All arguments match the base class.
         """
-        QCOW2Backend._unset_root(params, object)
+        QCOW2Backend._finalize(params, object)
 
 
 class QCOW2VTBackend(QCOW2Backend):
@@ -561,7 +543,7 @@ class QCOW2VTBackend(QCOW2Backend):
         vm.resume(timeout=3)
 
     @classmethod
-    def _check_root(cls, params: Params, object: Any = None) -> bool:
+    def _check(cls, params: Params, object: Any = None) -> bool:
         """
         Check whether a root state or essentially the object is running.
 
@@ -586,7 +568,7 @@ class QCOW2VTBackend(QCOW2Backend):
         return True
 
     @classmethod
-    def _set_root(cls, params: Params, object: Any = None) -> None:
+    def _initialize(cls, params: Params, object: Any = None) -> None:
         """
         Set a root state to provide running object.
 
@@ -616,7 +598,7 @@ class QCOW2VTBackend(QCOW2Backend):
                 env_process.preprocess_image(None, image_params, image_path)
 
     @classmethod
-    def _unset_root(cls, params: Params, object: Any = None) -> None:
+    def _finalize(cls, params: Params, object: Any = None) -> None:
         """
         Unset a root state to prevent object from running.
 
