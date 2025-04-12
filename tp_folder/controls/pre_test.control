@@ -55,7 +55,7 @@ def on_state(fn: Callable[[Params, Env], None], do: str) -> Callable[[VirtTest, 
         # all states are synced only via get
         if do in ["set", "unset"]:
             params["pool_scope"] = "own"
-        params["skip_types"] = "nets/vms/images nets"
+        params["skip_types"] = "nets"
         fn(params, env)
         del params["skip_types"]
     return wrapper
@@ -64,7 +64,7 @@ def off_state(fn: Callable[[Params, Env], None], do: str) -> Callable[[VirtTest,
         # all states are synced only via get
         if do in ["set", "unset"]:
             params["pool_scope"] = "own"
-        params["skip_types"] = "nets/vms"
+        params["skip_types"] = "nets/vms nets/vms/images"
         fn(params, env)
         del params["skip_types"]
     return wrapper
