@@ -210,9 +210,6 @@ def params_from_cmd(config: Params) -> None:
     }
     ramfile.RamfileBackend.image_state_backend = qcow2.QCOW2ExtBackend
 
-    # attach environment processing hooks
-    env_process_hooks()
-
 
 def full_vm_params_and_strs(
     param_dict: dict[str, str] | None,
@@ -276,33 +273,3 @@ def full_tests_params_and_str(
         tests_str += "only %s\n" % default
     log.debug("Parsed tests string '%s'", tests_str)
     return tests_params, tests_str
-
-
-def env_process_hooks() -> None:
-    """
-    Add env processing hooks to handle needed customization steps.
-
-    These steps include on/off state get/set operations, vmnet networking,
-    and instance attachment to environment.
-    """
-
-    def on_state(fn: Callable[[Any], Any]) -> Any:
-        def wrapper(test: VirtTest, params: Params, env: Env) -> Any:
-            params["skip_types"] = "nets/vms/images nets"
-            fn(params, env)
-            del params["skip_types"]
-
-        return wrapper
-
-    def off_state(fn: Callable[[Any], Any]) -> Any:
-        def wrapper(test: VirtTest, params: Params, env: Env) -> Any:
-            params["skip_types"] = "nets/vms"
-            fn(params, env)
-            del params["skip_types"]
-
-        return wrapper
-
-    env_process.preprocess_vm_off_hook = off_state(ss.get_states)
-    env_process.preprocess_vm_on_hook = on_state(ss.get_states)
-    env_process.postprocess_vm_on_hook = on_state(ss.set_states)
-    env_process.postprocess_vm_off_hook = off_state(ss.set_states)
