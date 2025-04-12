@@ -284,7 +284,7 @@ class StatesBoundaryTest(Test):
         self.driver = None
 
         self.mock_file_exists = mock.MagicMock()
-        # TODO: qcow2 is still needed for LVM root setting and too many tests
+        # TODO: qcow2 is still needed for LVM initialization and too many tests
         exists_patch = mock.patch('avocado_i2n.states.qcow2.os.path.exists',
                                   self.mock_file_exists)
         exists_patch.start()
@@ -558,7 +558,7 @@ class StatesBoundaryTest(Test):
                 ss.unset_states(self.run_params, self.env)
             self.driver.assert_unset(driver, "current_state", backend_type, 0)
 
-    def test_check_root_image_lvm(self):
+    def test_check_image_lvm(self):
         """Test that root checking with the LVM backend works."""
         backend = "lvm"
         backend_type = self._prepare_driver_from_backend(backend)
@@ -577,7 +577,7 @@ class StatesBoundaryTest(Test):
             driver.lv_check.assert_called_once_with("disk_vm1", "LogVol")
         self.assertEqual(states, [])
 
-    def test_check_root_image_qcow2(self):
+    def test_check_image_qcow2(self):
         """Test that root checking with the QCOW2 backend works."""
         backend = "qcow2"
         backend_type = self._prepare_driver_from_backend(backend)
@@ -598,7 +598,7 @@ class StatesBoundaryTest(Test):
             states = ss.show_states(self.run_params, self.env)
         self.assertEqual(states, [])
 
-    def test_check_root_vm_qcow2(self):
+    def test_check_vm_qcow2(self):
         """Test that root checking with the QCOW2VT backend works."""
         backend = "qcow2vt"
         backend_type = self._prepare_driver_from_backend(backend)
@@ -619,7 +619,7 @@ class StatesBoundaryTest(Test):
             states = ss.show_states(self.run_params, self.env)
         self.assertEqual(states, [])
 
-    def test_check_root_vm_ramfile(self):
+    def test_check_vm_ramfile(self):
         """Test that root checking with the ramfile backend works."""
         backend = "ramfile"
         backend_type = self._prepare_driver_from_backend(backend)
@@ -645,28 +645,10 @@ class StatesBoundaryTest(Test):
             states = ss.show_states(self.run_params, self.env)
         self.assertEqual(states, [])
 
-    def test_get_root(self):
-        """Test that root getting with a state backend works."""
-        # only test with most default backends
-        for backend in ss.BACKENDS:
-            with self.subTest(f"Testing get root for backend {backend}"):
-                # TODO: not fully isolated backends
-                if backend in ["qcow2ext"]:
-                    continue
-                # TODO: net-based not fully isolated backends
-                if backend in ["lxc", "btrfs", "vmnet"]:
-                    continue
-                backend_type = self._prepare_driver_from_backend(backend)
-                self.run_params[f"get_state_{backend_type}s_vm1"] = "root"
-
-                # cannot verify that the operation is NOOP so simply run it for coverage
-                with self.driver.mock_show([], backend_type, True) as driver:
-                    ss.get_states(self.run_params, self.env)
-
     @mock.patch('avocado_i2n.states.lvm.env_process', mock.Mock(return_value=0))
     @mock.patch('avocado_i2n.states.lvm.process')
-    def test_set_root_image_lvm(self, mock_process):
-        """Test that root setting with the LVM backend works."""
+    def test_initialize_image_lvm(self, mock_process):
+        """Test that initialization with the LVM backend works."""
         backend = "lvm"
         backend_type = self._prepare_driver_from_backend(backend)
         self.run_params["set_size_vm1"] = "30G"
@@ -707,8 +689,8 @@ class StatesBoundaryTest(Test):
         mock_process.run.assert_called_with('vgcreate disk_vm1 /dev/loop0', sudo=True)
 
     @mock.patch('avocado_i2n.states.qcow2.env_process')
-    def test_set_root_image_qcow2(self, mock_env_process):
-        """Test that root setting with the QCOW2 backend works."""
+    def test_initialize_image_qcow2(self, mock_env_process):
+        """Test that initialization with the QCOW2 backend works."""
         backend = "qcow2"
         backend_type = self._prepare_driver_from_backend(backend)
         self.run_params["show_mode"] = "xf"
@@ -718,7 +700,7 @@ class StatesBoundaryTest(Test):
         with self.driver.mock_show([], backend_type, False) as driver:
             ss.show_states(self.run_params, self.env)
             self.mock_vms["vm1"].is_alive.assert_called()
-            # called twice because QCOW2's set_root can only set missing root part
+            # called twice because QCOW2's initialize can only set missing root part
             # like only turning off the vm or only creating an image
             self.mock_file_exists.assert_called_with("/images/vm1/image.qcow2")
         mock_env_process.preprocess_image.assert_called_once()
@@ -734,8 +716,8 @@ class StatesBoundaryTest(Test):
         mock_env_process.preprocess_image.assert_called_once()
 
     @mock.patch('avocado_i2n.states.qcow2.env_process')
-    def test_set_root_vm(self, mock_env):
-        """Test that root setting with a vm state backend works."""
+    def test_initialize_vm(self, mock_env):
+        """Test that initialization with a vm state backend works."""
         self.run_params["show_mode"] = "xf"
 
         for backend in ["qcow2vt", "ramfile"]:
@@ -752,8 +734,8 @@ class StatesBoundaryTest(Test):
                         mock_env.preprocess_image.assert_called_once()
 
     @mock.patch('avocado_i2n.states.lvm.vg_cleanup')
-    def test_unset_root_image_lvm(self, mock_vg_cleanup):
-        """Test that root unsetting with the LVM backend works."""
+    def test_finalize_image_lvm(self, mock_vg_cleanup):
+        """Test that finalization with the LVM backend works."""
         backend = "lvm"
         backend_type = self._prepare_driver_from_backend(backend)
         self.run_params["image_name_vm1"] = "vm1/image"
@@ -781,8 +763,8 @@ class StatesBoundaryTest(Test):
 
     @mock.patch('avocado_i2n.states.qcow2.os')
     @mock.patch('avocado_i2n.states.qcow2.env_process')
-    def test_unset_root_image_qcow2(self, mock_env_process, mock_os):
-        """Test that root unsetting with the QCOW2 backend works."""
+    def test_finalize_image_qcow2(self, mock_env_process, mock_os):
+        """Test that finalization with the QCOW2 backend works."""
         backend = "qcow2"
         backend_type = self._prepare_driver_from_backend(backend)
         self.run_params["show_mode"] = "fx"
@@ -801,8 +783,8 @@ class StatesBoundaryTest(Test):
         pass
 
     @mock.patch('avocado_i2n.states.qcow2.env_process')
-    def test_unset_root_vm(self, mock_env_process):
-        """Test that root unsetting with a vm state backend works."""
+    def test_finalize_vm(self, mock_env_process):
+        """Test that finalization with a vm state backend works."""
         self.run_params["show_mode"] = "fx"
 
         for backend in ["qcow2vt", "ramfile"]:
@@ -913,10 +895,9 @@ class StatesPoolTest(Test):
     def _create_mock_sourced_backend(self, source_type="root"):
         if source_type == "root":
             self.backend = pool.RootSourcedStateBackend
-            self.backend._check_root = mock.MagicMock()
-            self.backend._get_root = mock.MagicMock()
-            self.backend._set_root = mock.MagicMock()
-            self.backend._unset_root = mock.MagicMock()
+            self.backend._check = mock.MagicMock()
+            self.backend._initialize = mock.MagicMock()
+            self.backend._finalize = mock.MagicMock()
         else:
             self.backend = pool.SourcedStateBackend
             self.backend._show = mock.MagicMock()
@@ -974,53 +955,53 @@ class StatesPoolTest(Test):
 
     @mock.patch("avocado_i2n.states.pool.os.path.exists",
                 mock.MagicMock(return_value=False))
-    def test_check_root(self):
+    def test_check(self):
         """Test that root checking prioritizes local root then pool root."""
         self.run_params["object_type"] = "images"
         self._create_mock_sourced_backend()
 
         # consider pool root with priority
-        self.backend._check_root.reset_mock()
-        self.backend.transport.check_root.reset_mock()
-        self.backend._check_root.return_value = False
-        self.backend.transport.check_root.return_value = True
-        exists = self.backend.check_root(self.run_params, self.env)
-        self.backend._check_root.assert_called_once()
-        self.backend.transport.check_root.assert_called_once()
+        self.backend._check.reset_mock()
+        self.backend.transport.check.reset_mock()
+        self.backend._check.return_value = False
+        self.backend.transport.check.return_value = True
+        exists = self.backend.check(self.run_params, self.env)
+        self.backend._check.assert_called_once()
+        self.backend.transport.check.assert_called_once()
         self.assertTrue(exists)
 
         # consider local root as well
-        self.backend._check_root.reset_mock()
-        self.backend.transport.check_root.reset_mock()
-        self.backend._check_root.return_value = True
-        self.backend.transport.check_root.return_value = False
-        exists = self.backend.check_root(self.run_params, self.env)
-        self.backend._check_root.assert_called_once()
-        self.backend.transport.check_root.assert_called_once()
+        self.backend._check.reset_mock()
+        self.backend.transport.check.reset_mock()
+        self.backend._check.return_value = True
+        self.backend.transport.check.return_value = False
+        exists = self.backend.check(self.run_params, self.env)
+        self.backend._check.assert_called_once()
+        self.backend.transport.check.assert_called_once()
         self.assertTrue(exists)
 
         # the root state does not exist if both counterparts do not exist
-        self.backend._check_root.reset_mock()
-        self.backend.transport.check_root.reset_mock()
-        self.backend._check_root.return_value = False
-        self.backend.transport.check_root.return_value = False
-        exists = self.backend.check_root(self.run_params, self.env)
-        self.backend._check_root.assert_called_once()
-        self.backend.transport.check_root.assert_called_once()
+        self.backend._check.reset_mock()
+        self.backend.transport.check.reset_mock()
+        self.backend._check.return_value = False
+        self.backend.transport.check.return_value = False
+        exists = self.backend.check(self.run_params, self.env)
+        self.backend._check.assert_called_once()
+        self.backend.transport.check.assert_called_once()
         self.assertFalse(exists)
 
-    def test_check_root_use(self):
+    def test_check_use(self):
         """Test that root checking uses only local root with disabled pool."""
         self.run_params["pool_scope"] = "own"
         self._create_mock_sourced_backend()
 
-        self.backend._check_root.return_value = False
-        exists = self.backend.check_root(self.run_params, self.env)
-        self.backend._check_root.assert_called_once()
-        self.backend.transport.check_root.assert_not_called()
+        self.backend._check.return_value = False
+        exists = self.backend.check(self.run_params, self.env)
+        self.backend._check.assert_called_once()
+        self.backend.transport.check.assert_not_called()
         self.assertFalse(exists)
 
-    def test_get_root(self):
+    def test_download(self):
         """Test that root getting with the pool backend works."""
         self._set_minimal_pool_params()
         self.run_params["vms_base_dir"] = "/images"
@@ -1028,112 +1009,104 @@ class StatesPoolTest(Test):
         self._create_mock_sourced_backend()
 
         # consider local root with priority if valid
-        self.backend._get_root.reset_mock()
         self.backend.transport.reset_mock()
-        self.backend._check_root.return_value = True
-        self.backend.transport.check_root.return_value = True
+        self.backend._check.return_value = True
+        self.backend.transport.check.return_value = True
         self.backend.transport.ops.compare.return_value = True
-        self.backend.get_root(self.run_params, self.env)
-        self.backend._get_root.assert_called_once()
-        self.backend.transport.get_root.assert_not_called()
+        self.backend.download(self.run_params, self.env)
+        self.backend.transport.download.assert_not_called()
         self.backend.transport.ops.compare.assert_called_once_with('/images/vm1/image1.qcow2',
                                                                    ':/data/pool/vm1/image1.qcow2',
                                                                    mock.ANY)
 
         # use pool root if enabled and no local root
-        self.backend._get_root.reset_mock()
         self.backend.transport.reset_mock()
-        self.backend._check_root.return_value = False
-        self.backend.transport.check_root.return_value = True
-        self.backend.get_root(self.run_params, self.env)
-        self.backend._get_root.assert_called_once()
-        self.backend.transport.get_root.assert_called_once()
+        self.backend._check.return_value = False
+        self.backend.transport.check.return_value = True
+        self.backend.download(self.run_params, self.env)
+        self.backend.transport.download.assert_called_once()
         self.backend.transport.ops.compare.assert_not_called()
 
         # use pool root if local root is not valid
-        self.backend._get_root.reset_mock()
         self.backend.transport.reset_mock()
-        self.backend._check_root.return_value = True
-        self.backend.transport.check_root.return_value = True
+        self.backend._check.return_value = True
+        self.backend.transport.check.return_value = True
         self.backend.transport.ops.compare.return_value = False
-        self.backend.get_root(self.run_params, self.env)
-        self.backend._get_root.assert_called_once()
-        self.backend.transport.get_root.assert_called_once()
+        self.backend.download(self.run_params, self.env)
+        self.backend.transport.download.assert_called_once()
         self.backend.transport.ops.compare.assert_called_once_with('/images/vm1/image1.qcow2',
                                                                    ':/data/pool/vm1/image1.qcow2',
                                                                    mock.ANY)
 
-    def test_get_root_use(self):
+    def test_download_use(self):
         """Test that root getting uses only local root with disabled pool."""
         self.run_params["pool_scope"] = "own"
         self._create_mock_sourced_backend()
 
-        self.backend.get_root(self.run_params, self.env)
-        self.backend._get_root.assert_called_once()
-        self.backend.transport.get_root.assert_not_called()
+        self.backend.download(self.run_params, self.env)
+        self.backend.transport.download.assert_not_called()
 
-    def test_get_root_update(self):
+    def test_download_update(self):
         """Test that root getting can be forced to pool only via the update switch."""
         self.run_params["pool_scope"] = "shared"
         self._create_mock_sourced_backend()
 
-        self.backend.get_root(self.run_params, self.env)
-        self.backend._get_root.assert_not_called()
-        self.backend.transport.get_root.assert_called_once()
+        self.backend.download(self.run_params, self.env)
+        self.backend.transport.download.assert_called_once()
 
-    def test_set_root(self):
-        """Test that root setting with the pool backend works."""
+    def test_initialize(self):
+        """Test that initialization with the pool backend works."""
         self._create_mock_sourced_backend()
 
         # not updating the state pool means setting the local root
         self.run_params["pool_scope"] = "own"
-        self.backend._check_root.return_value = True
-        self.backend._set_root.reset_mock()
-        self.backend.transport.set_root.reset_mock()
-        self.backend.set_root(self.run_params, self.env)
-        self.backend._set_root.assert_called_once()
-        self.backend.transport.set_root.assert_not_called()
+        self.backend._check.return_value = True
+        self.backend._initialize.reset_mock()
+        self.backend.transport.initialize.reset_mock()
+        self.backend.initialize(self.run_params, self.env)
+        self.backend._initialize.assert_called_once()
+        self.backend.transport.initialize.assert_not_called()
 
         # updating the state pool means not setting the local root
         self.run_params["pool_scope"] = "shared"
-        self.backend._check_root.return_value = True
-        self.backend._set_root.reset_mock()
-        self.backend.transport.set_root.reset_mock()
-        self.backend.set_root(self.run_params, self.env)
-        self.backend._set_root.assert_not_called()
-        self.backend.transport.set_root.assert_called_once()
+        self.backend._check.return_value = True
+        self.backend._initialize.reset_mock()
+        self.backend.transport.initialize.reset_mock()
+        self.backend.initialize(self.run_params, self.env)
+        self.backend._initialize.assert_not_called()
+        self.backend.transport.initialize.assert_called_once()
 
-    def test_set_root_update(self):
+    def test_initialize_update(self):
         """Test that updating the state pool without local root fails early."""
         self.run_params["pool_scope"] = "shared"
         self._create_mock_sourced_backend()
 
-        self.backend._check_root.return_value = False
+        self.backend._check.return_value = False
         with self.assertRaises(RuntimeError):
-            self.backend.set_root(self.run_params, self.env)
+            self.backend.initialize(self.run_params, self.env)
         self.backend.transport.assert_not_called()
 
-    def test_unset_root(self):
-        """Test that root unsetting with the pool backend works."""
+    def test_finalize(self):
+        """Test that finalization with the pool backend works."""
         self._create_mock_sourced_backend()
 
         # not updating the state pool means unsetting the local root
         self.run_params["pool_scope"] = "own"
-        self.backend._check_root.return_value = True
-        self.backend._unset_root.reset_mock()
-        self.backend.transport.unset_root.reset_mock()
-        self.backend.unset_root(self.run_params, self.env)
-        self.backend._unset_root.assert_called_once()
-        self.backend.transport.unset_root.assert_not_called()
+        self.backend._check.return_value = True
+        self.backend._finalize.reset_mock()
+        self.backend.transport.finalize.reset_mock()
+        self.backend.finalize(self.run_params, self.env)
+        self.backend._finalize.assert_called_once()
+        self.backend.transport.finalize.assert_not_called()
 
         # updating the state pool means not unsetting the local root
         self.run_params["pool_scope"] = "shared"
-        self.backend._check_root.return_value = True
-        self.backend._unset_root.reset_mock()
-        self.backend.transport.unset_root.reset_mock()
-        self.backend.unset_root(self.run_params, self.env)
-        self.backend._unset_root.assert_not_called()
-        self.backend.transport.unset_root.assert_called_once()
+        self.backend._check.return_value = True
+        self.backend._finalize.reset_mock()
+        self.backend.transport.finalize.reset_mock()
+        self.backend.finalize(self.run_params, self.env)
+        self.backend._finalize.assert_not_called()
+        self.backend.transport.finalize.assert_called_once()
 
     def test_show_all(self):
         """Test that state listing finds both cache and pool states."""
@@ -1449,7 +1422,7 @@ class StatesPoolTest(Test):
         self._create_mock_transfer_backend()
 
         self.backend.ops.list_paths.return_value = ["image1.qcow2"]
-        exists = self.backend.check_root(self.run_params, self.env)
+        exists = self.backend.check(self.run_params, self.env)
         self.backend.ops.list_paths.assert_called_with(":/data/pool/vm1", mock.ANY)
         self.assertTrue(exists)
 
@@ -1527,7 +1500,7 @@ class StatesPoolTest(Test):
 
         self._create_mock_transfer_backend()
 
-        self.backend.get_root(self.run_params, self.env)
+        self.backend.download(self.run_params, self.env)
         self.backend.ops.download.assert_called_with("/images/vm1/image1.qcow2",
                                                      ":/data/pool/vm1/image1.qcow2",
                                                      mock.ANY)
@@ -1557,7 +1530,7 @@ class StatesPoolTest(Test):
 
         self._create_mock_transfer_backend()
 
-        self.backend.set_root(self.run_params, self.env)
+        self.backend.initialize(self.run_params, self.env)
         self.backend.ops.upload.assert_called_with("/images/vm1/image1.qcow2",
                                                    ":/data/pool/vm1/image1.qcow2",
                                                    mock.ANY)
@@ -1587,7 +1560,7 @@ class StatesPoolTest(Test):
 
         self._create_mock_transfer_backend()
 
-        self.backend.unset_root(self.run_params, self.env)
+        self.backend.finalize(self.run_params, self.env)
         self.backend.ops.delete.assert_called_with(":/data/pool/vm1/image1.qcow2",
                                                    mock.ANY)
 
@@ -1862,24 +1835,25 @@ class StatesSetupTest(Test):
 
         # assert state showing is performed if state is available
         self.backend.reset_mock()
-        self.backend.check_root.return_value = True
+        self.backend.check.return_value = True
         self.backend.show.return_value = ["state"]
         states = ss.show_states(self.run_params, self.env)
         # assert root state is checked as a prerequisite
-        self.backend.check_root.assert_called_once()
+        self.backend.check.assert_called_once()
         # assert root state is reused
-        self.backend.get_root.assert_called_once()
+        self.backend.initialize.assert_not_called()
+        self.backend.finalize.assert_not_called()
         # assert actual state is still checked and not available
         self.backend.show.assert_called_once()
         self.assertEqual(states, ["state"])
 
         # assert state showing is aborted if preconditions are not met
         self.backend.reset_mock()
-        self.backend.check_root.return_value = False
+        self.backend.check.return_value = False
         with self.assertRaises(exceptions.TestAbortError):
             ss.show_states(self.run_params, self.env)
         # assert root state is checked as a prerequisite
-        self.backend.check_root.assert_called_once()
+        self.backend.check.assert_called_once()
         # boundary code should not be reached
         self.backend.show.assert_not_called()
 
@@ -1890,21 +1864,21 @@ class StatesSetupTest(Test):
 
         # assert state showing is aborted if preconditions are met
         self.backend.reset_mock()
-        self.backend.check_root.return_value = True
+        self.backend.check.return_value = True
         with self.assertRaises(exceptions.TestAbortError):
             ss.show_states(self.run_params, self.env)
         # assert root state is checked as a prerequisite
-        self.backend.check_root.assert_called_once()
+        self.backend.check.assert_called_once()
         # boundary code should not be reached
         self.backend.show.assert_not_called()
 
         # assert state showing is aborted if preconditions are not met
         self.backend.reset_mock()
-        self.backend.check_root.return_value = False
+        self.backend.check.return_value = False
         with self.assertRaises(exceptions.TestAbortError):
             ss.show_states(self.run_params, self.env)
         # assert root state is checked as a prerequisite
-        self.backend.check_root.assert_called_once()
+        self.backend.check.assert_called_once()
         # boundary code should not be reached
         self.backend.show.assert_not_called()
 
@@ -1914,26 +1888,26 @@ class StatesSetupTest(Test):
         self.run_params["show_mode"] = "ff"
 
         # assert root state is detected then removed to perform precondition cleanup
-        self.backend.check_root.return_value = True
+        self.backend.check.return_value = True
         self.backend.show.return_value = []
         states = ss.show_states(self.run_params, self.env)
         # assert root state is checked as a prerequisite
-        self.backend.check_root.assert_called_once()
+        self.backend.check.assert_called_once()
         # assert root state is always made available (forced provision if not available)
-        self.backend.unset_root.assert_called_once()
+        self.backend.finalize.assert_called_once()
         # assert actual state is still checked and not available
         self.backend.show.assert_called_once()
         self.assertEqual(states, [])
 
         # assert root state is not detected then created to check the actual state
         self.backend.reset_mock()
-        self.backend.check_root.return_value = False
+        self.backend.check.return_value = False
         self.backend.show.return_value = []
         states = ss.show_states(self.run_params, self.env)
         # assert root state is checked as a prerequisite
-        self.backend.check_root.assert_called_once()
+        self.backend.check.assert_called_once()
         # assert root state is recreated (forced provision if available)
-        self.backend.set_root.assert_called_once()
+        self.backend.initialize.assert_called_once()
         # assert actual state is still checked and not available
         self.backend.show.assert_called_once()
         self.assertEqual(states, [])
@@ -1945,12 +1919,13 @@ class StatesSetupTest(Test):
 
         # assert state retrieval is ignored if state is available
         self.backend.reset_mock()
-        self.backend.check_root.return_value = False
+        self.backend.check.return_value = False
         states = ss.show_states(self.run_params, self.env)
         # assert root state is checked as a prerequisite
-        self.backend.check_root.assert_called_once()
+        self.backend.check.assert_called_once()
         # assert root state is not reused and fully ignored
-        self.backend.get_root.assert_not_called()
+        self.backend.initialize.assert_not_called()
+        self.backend.finalize.assert_not_called()
         # boundary code should not be reached
         self.backend.show.assert_not_called()
         self.assertEqual(states, [])
@@ -1962,21 +1937,21 @@ class StatesSetupTest(Test):
 
         # assert invalid policy x if preconditions are met
         self.backend.reset_mock()
-        self.backend.check_root.return_value = True
+        self.backend.check.return_value = True
         with self.assertRaises(exceptions.TestError):
             ss.show_states(self.run_params, self.env)
         # assert root state is checked as a prerequisite
-        self.backend.check_root.assert_called_once()
+        self.backend.check.assert_called_once()
         # boundary code should not be reached
         self.backend.show.assert_not_called()
 
         # assert invalid policy x if preconditions are not met
         self.backend.reset_mock()
-        self.backend.check_root.return_value = False
+        self.backend.check.return_value = False
         with self.assertRaises(exceptions.TestError):
             ss.show_states(self.run_params, self.env)
         # assert root state is checked as a prerequisite
-        self.backend.check_root.assert_called_once()
+        self.backend.check.assert_called_once()
         # boundary code should not be reached
         self.backend.show.assert_not_called()
 
