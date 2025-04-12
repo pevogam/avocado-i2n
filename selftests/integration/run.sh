@@ -46,8 +46,10 @@ if [ ! -f /etc/avocado/conf.d/i2n.conf ]; then
 fi
 sed -i "s#suite_path = .*#suite_path = ${test_suite}#" "${i2n_config}"
 rm ${HOME}/avocado_overwrite_* -fr
-rm -fr /mnt/local/images/swarm/*
-rm -fr /mnt/local/images/shared/vm1-* /mnt/local/images/shared/vm2-*
+readonly ims="mnt/local/images"
+rm -fr /$ims/swarm/*
+rm -fr /$ims/c10*/rootfs/$ims/vm3/
+rm -fr /$ims/shared/vm1-* /$ims/shared/vm2-*
 
 # minimal other dependencies for the integration run
 dnf install -y python3-coverage python3-lxc
@@ -81,7 +83,6 @@ test $(ls -A1q "$test_results/latest/test-results" | grep tutorial_finale.getset
 
 echo
 echo "Check if all containers have identical and synced states after the run"
-ims="mnt/local/images"
 containers="$(printf $test_slots | sed "s/,/ /g" | sed "s/net/10/g")"
 for cid in $containers; do
     diff -r /$ims/c101/rootfs/$ims /$ims/c$cid/rootfs/$ims -x el8-64* -x f40-64* -x win10-64* -x vm3 || (echo "Different states found at ${cid}" && exit 1)
