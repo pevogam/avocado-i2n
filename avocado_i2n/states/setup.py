@@ -108,17 +108,7 @@ class StateBackend:
         raise NotImplementedError("Cannot use abstract state backend")
 
     @classmethod
-    def get_root(cls, params: dict[str, str], object: Any = None) -> None:
-        """
-        Get a root state or essentially due to pre-existence do nothing.
-
-        :param params: configuration parameters
-        :param object: object whose states are manipulated
-        """
-        pass
-
-    @classmethod
-    def set_root(cls, params: dict[str, str], object: Any = None) -> None:
+    def initialize(cls, params: dict[str, str], object: Any = None) -> None:
         """
         Set a root state to provide object existence.
 
@@ -128,7 +118,7 @@ class StateBackend:
         raise NotImplementedError("Cannot use abstract state backend")
 
     @classmethod
-    def unset_root(cls, params: dict[str, str], object: Any = None) -> None:
+    def finalize(cls, params: dict[str, str], object: Any = None) -> None:
         """
         Unset a root state to prevent object existence.
 
@@ -274,7 +264,7 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
         elif not root_exists and "f" == action_if_doesnt_exist:
             logging.info("Creating missing state management preconditions")
             root_params["pool_scope"] = "own"
-            state_backend.set_root(root_params, state_object)
+            state_backend.initialize(root_params, state_object)
             root_exists = True
         elif not root_exists:
             raise exceptions.TestError(
@@ -287,7 +277,7 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
                 "Aborting because of unwanted state management preconditions"
             )
         elif root_exists and "r" == action_if_exists:
-            state_backend.get_root(root_params, state_object)
+            pass
         elif root_exists and "f" == action_if_exists:
             logging.info("Removing present state management preconditions")
             root_params["pool_scope"] = "own"
@@ -298,7 +288,7 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
                     == "yes"
                 )
             else:
-                state_backend.unset_root(root_params, state_object)
+                state_backend.finalize(root_params, state_object)
             root_exists = False
         elif root_exists:
             raise exceptions.TestError(

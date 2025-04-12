@@ -205,7 +205,7 @@ class RamfileBackend(SourcedStateBackend):
         return True
 
     @classmethod
-    def set_root(cls, params: Params, object: Any = None) -> None:
+    def initialize(cls, params: Params, object: Any = None) -> None:
         """
         Set a root state to provide running object.
 
@@ -230,10 +230,10 @@ class RamfileBackend(SourcedStateBackend):
 
         for image_name in params.objects("images"):
             image_params = params.object_params(image_name)
-            RamfileBackend.image_state_backend.set_root(image_params)
+            RamfileBackend.image_state_backend.initialize(image_params)
 
     @classmethod
-    def unset_root(cls, params: Params, object: Any = None) -> None:
+    def finalize(cls, params: Params, object: Any = None) -> None:
         """
         Unset a root state to prevent object from running.
 
@@ -243,4 +243,4 @@ class RamfileBackend(SourcedStateBackend):
 
         for image_name in params.objects("images"):
             image_params = params.object_params(image_name)
-            RamfileBackend.image_state_backend.unset_root(image_params)
+            RamfileBackend.image_state_backend.finalize(image_params)
