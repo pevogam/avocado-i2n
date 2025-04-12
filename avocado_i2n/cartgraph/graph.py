@@ -1930,10 +1930,11 @@ class TestGraph(object):
         setup_dict.update(
             {
                 "type": "shared_configure_install",
+                "skip_image_processing": "no",
+                "create_image": "yes",
+                "force_create_image": "yes",
                 # overwrite some params inherited from the modified install node
                 f"set_state_images_{object_image}_{object_vm}": "",
-                "show_mode": "rf",  # implicit root handling
-                "start_vm": "no",
             }
         )
         pre_node = TestGraph.parse_node_from_object(
