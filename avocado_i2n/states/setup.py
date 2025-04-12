@@ -97,7 +97,7 @@ class StateBackend:
         raise NotImplementedError("Cannot use abstract state backend")
 
     @classmethod
-    def check_root(cls, params: dict[str, str], object: Any = None) -> bool:
+    def check(cls, params: dict[str, str], object: Any = None) -> bool:
         """
         Check whether a root state or essentially the object exists.
 
@@ -108,17 +108,7 @@ class StateBackend:
         raise NotImplementedError("Cannot use abstract state backend")
 
     @classmethod
-    def get_root(cls, params: dict[str, str], object: Any = None) -> None:
-        """
-        Get a root state or essentially due to pre-existence do nothing.
-
-        :param params: configuration parameters
-        :param object: object whose states are manipulated
-        """
-        pass
-
-    @classmethod
-    def set_root(cls, params: dict[str, str], object: Any = None) -> None:
+    def initialize(cls, params: dict[str, str], object: Any = None) -> None:
         """
         Set a root state to provide object existence.
 
@@ -128,7 +118,7 @@ class StateBackend:
         raise NotImplementedError("Cannot use abstract state backend")
 
     @classmethod
-    def unset_root(cls, params: dict[str, str], object: Any = None) -> None:
+    def finalize(cls, params: dict[str, str], object: Any = None) -> None:
         """
         Unset a root state to prevent object existence.
 
@@ -256,7 +246,7 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
         action_if_doesnt_exist = state_params["show_mode"][1]
 
         # always check the corresponding root state as a prerequisite
-        root_exists = state_backend.check_root(state_params, state_object)
+        root_exists = state_backend.check(state_params, state_object)
         root_params = state_params.copy()
         if not root_exists and "a" == action_if_doesnt_exist:
             raise exceptions.TestAbortError(
@@ -268,7 +258,7 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
         elif not root_exists and "f" == action_if_doesnt_exist:
             logging.info("Creating missing state management preconditions")
             root_params["pool_scope"] = "own"
-            state_backend.set_root(root_params, state_object)
+            state_backend.initialize(root_params, state_object)
             root_exists = True
         elif not root_exists:
             raise exceptions.TestError(
@@ -281,11 +271,12 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
                 "Aborting because of unwanted state management preconditions"
             )
         elif root_exists and "r" == action_if_exists:
-            state_backend.get_root(root_params, state_object)
+            if hasattr(state_backend, "download"):
+                state_backend.download(root_params, state_object)
         elif root_exists and "f" == action_if_exists:
             logging.info("Removing present state management preconditions")
             root_params["pool_scope"] = "own"
-            state_backend.unset_root(root_params, state_object)
+            state_backend.finalize(root_params, state_object)
             root_exists = False
         elif root_exists:
             raise exceptions.TestError(
