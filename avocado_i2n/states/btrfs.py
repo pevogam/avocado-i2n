@@ -81,7 +81,7 @@ class BtrfsBackend(StateBackend):
         raise NotImplementedError("Implement Btrfs states based on demand.")
 
     @classmethod
-    def set_root(cls, params: Params, object: Any = None) -> None:
+    def initialize(cls, params: Params, object: Any = None) -> None:
         """
         Set a root state to provide object existence.
 
@@ -90,7 +90,7 @@ class BtrfsBackend(StateBackend):
         raise NotImplementedError("Implement Btrfs states based on demand.")
 
     @classmethod
-    def unset_root(cls, params: Params, object: Any = None) -> None:
+    def finalize(cls, params: Params, object: Any = None) -> None:
         """
         Unset a root state to prevent object existence.
 
