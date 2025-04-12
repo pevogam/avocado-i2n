@@ -104,6 +104,7 @@ class RamfileBackend(SourcedStateBackend):
             image_params = params.object_params(image_name)
             # TODO: refine method arguments by providing at least the image name directly
             image_params["images"] = image_name
+            image_params["get_switch"] = "none"
             cls.image_state_backend.get(image_params, vm)
 
         state_dir = params["swarm_pool"]
@@ -139,6 +140,7 @@ class RamfileBackend(SourcedStateBackend):
             image_params = params.object_params(image_name)
             # TODO: refine method arguments by providing at least the image name directly
             image_params["images"] = image_name
+            image_params["set_switch"] = "none"
             cls.image_state_backend.set(image_params, vm)
 
         # BUG: because the built-in functionality uses system_reset
@@ -164,6 +166,7 @@ class RamfileBackend(SourcedStateBackend):
             image_params = params.object_params(image_name)
             # TODO: refine method arguments by providing at least the image name directly
             image_params["images"] = image_name
+            image_params["unset_switch"] = "none"
             cls.image_state_backend.unset(image_params, vm)
 
         state_dir = params["swarm_pool"]

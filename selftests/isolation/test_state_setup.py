@@ -65,11 +65,7 @@ class MockDriver(unittest.TestCase):
             with mock.patch('avocado_i2n.states.lvm.lv_utils', mock_driver):
                 yield mock_driver
         elif backend in ["qcow2", "qcow2vt"]:
-            if backend == "qcow2":
-                self.mock_vms["vm1"].is_alive.return_value = False
-                self.exist_switch = root_exists
-            elif backend == "qcow2vt":
-                self.exist_switch = root_exists
+            self.exist_switch = root_exists
             output = ""
             for state in state_names:
                 size = "0 B" if state_type == "image" else "1 GiB"
@@ -276,6 +272,10 @@ class StatesBoundaryTest(Test):
         self.run_params["states_images"] = "mock"
         self.run_params["states_vms"] = "mock"
         self.run_params["show_state"] = ".+"
+        self.run_params["get_switch"] = "hard"
+        self.run_params["set_switch"] = "soft"
+        self.run_params["unset_switch"] = "soft"
+        self.run_params["show_state"] = ".+"
         self.run_params["nets_gateway"] = ""
         self.run_params["nets_host"] = ""
         self.run_params["pool_scope"] = "own"
@@ -464,33 +464,6 @@ class StatesBoundaryTest(Test):
         # TODO: we cannot guarantee the order for pool backends and we don't attribute meaning to it
         self.assertEqual(set(states), set(["launch", "root"]))
 
-    def test_show_image_qcow2_boot(self):
-        """
-        Test that state checking with the QCOW2 backend considers running vms.
-
-        .. todo:: Consider whether this is a good approach to spread to other
-            state backends or rid ourselves of the QCOW2(VT) hacks altogether.
-        """
-        backend = "qcow2"
-        backend_type = self._prepare_driver_from_backend(backend)
-        # keep a passive precondition behavior for this test
-        self.run_params["show_mode"] = "ri"
-
-        # assert behavior on root and state availability
-        with self.driver.mock_show(["launch"], backend_type, True) as driver:
-            self.mock_vms["vm1"].is_alive.return_value = True
-            states = ss.show_states(self.run_params, self.env)
-            # TODO: define more action types to achieve backend independence here,
-            # perhaps after we generalize run vm requirement to all backend roots
-            #self.driver.assert_check(driver, "launch", backend_type, 2)
-            # assert root state is checked as a prerequisite
-            # assert off switch as part of root state is checked as a prerequisite
-            self.mock_vms["vm1"].is_alive.assert_called()
-            self.mock_file_exists.assert_not_called()
-            # assert actual state is not checked and not available
-            driver.system_output.assert_not_called()
-        self.assertEqual(states, [])
-
     def test_show_vm_qcow2_noimage(self):
         """
         Test that state checking with the QCOW2VT backend considers missing images.
@@ -625,12 +598,6 @@ class StatesBoundaryTest(Test):
 
         # assert root state is correctly not detected
         with self.driver.mock_show([], backend_type, False) as driver:
-            states = ss.show_states(self.run_params, self.env)
-        self.assertEqual(states, [])
-
-        # assert running vms result in not completely available root state
-        with self.driver.mock_show([], backend_type, True) as driver:
-            self.mock_vms["vm1"].is_alive.return_value = True
             states = ss.show_states(self.run_params, self.env)
         self.assertEqual(states, [])
 
@@ -780,15 +747,15 @@ class StatesBoundaryTest(Test):
             self.mock_file_exists.assert_called_with("/images/vm1/image.qcow2")
         mock_env_process.preprocess_image.assert_called_once()
 
-        # assert running vms result in setting only remaining part of root state
+        # assert running vms are shut down before setting state preconditions
         mock_env_process.reset_mock()
-        with self.driver.mock_show([], backend_type, True) as driver:
+        with self.driver.mock_show([], backend_type, False) as driver:
             self.mock_vms["vm1"].is_alive.return_value = True
             ss.set_states(self.run_params, self.env)
             # is vm is not alive root is not available and no need to check image existence
             self.mock_vms["vm1"].is_alive.assert_called()
             self.mock_vms["vm1"].destroy.assert_called_once_with(gracefully=True)
-        mock_env_process.preprocess_image.assert_not_called()
+        mock_env_process.preprocess_image.assert_called_once()
 
     @mock.patch('avocado_i2n.states.qcow2.env_process')
     def test_set_root_vm(self, mock_env):
