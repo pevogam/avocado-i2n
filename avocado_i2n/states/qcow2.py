@@ -562,28 +562,6 @@ class QCOW2VTBackend(QCOW2Backend):
         vm.resume(timeout=3)
 
     @classmethod
-    def unset(cls, params: Params, object: Any = None) -> None:
-        """
-        Remove a state with previous changes.
-
-        All arguments match the base class.
-        """
-        vm, vm_name = object, params["vms"]
-        logging.info("Removing vm state '%s' of %s", params["unset_state"], vm_name)
-
-        if vm is None or not vm.is_alive():
-            raise RuntimeError("No booted vm and thus vm state to unset")
-
-        vm.pause()
-        # NOTE: this was supposed to be implemented in the Qemu VM object but
-        # it is not unlike savevm and loadvm, perhaps due to command availability
-        vm.verify_status("paused")
-        logging.debug("Deleting VM %s from %s", vm_name, params["unset_state"])
-        vm.monitor.send_args_cmd("delvm id=%s" % params["unset_state"])
-        vm.verify_status("paused")
-        vm.resume(timeout=3)
-
-    @classmethod
     def _check_root(cls, params: Params, object: Any = None) -> bool:
         """
         Check whether a root state or essentially the object is running.
