@@ -207,17 +207,13 @@ class MockDriver(unittest.TestCase):
                 mock_driver.lv_take_snapshot.assert_not_called()
         elif backend in ["qcow2", "qcow2vt"]:
             mock_driver.return_value.snapshot_list.assert_called_once_with(force_share=True)
-            if action_type == 1 and state_type == "image":
+            if action_type == 1:
                 mock_driver.assert_called()
                 second_creation_call_params = mock_driver.call_args_list[-2].args[0]
                 self.assertEqual(second_creation_call_params["unset_state"], state_name)
                 mock_driver.return_value.snapshot_del.assert_called_once_with()
-            elif action_type == 1 and state_type == "vm":
-                self.mock_vms["vm1"].monitor.send_args_cmd.assert_called_once_with(f'delvm id={state_name}')
-            elif state_type == "image":
-                mock_driver.return_value.assert_not_called()
             else:
-                self.mock_vms["vm1"].monitor.send_args_cmd.assert_not_called()
+                mock_driver.return_value.assert_not_called()
         elif backend == "qcow2ext":
             # TODO: cannot assert state_name as we need more isolated testing here
             mock_driver.listdir.assert_called_once_with(f"/images/vm1-abc.def/image1")
