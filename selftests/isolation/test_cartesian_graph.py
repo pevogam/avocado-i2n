@@ -4071,7 +4071,7 @@ class CartesianGraphTest(Test):
         graph = self._load_for_parsing("leaves..tutorial_get,leaves..tutorial_gui", {"nets": "net1"})
 
         DummyStateControl.asserted_states["check"]["root"] = {self.shared_pool: True}
-        DummyStateControl.asserted_states["check"].update({"guisetup.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
+        DummyStateControl.asserted_states["check"].update({"guisetup.noop": {self.shared_pool: False}, "fedora.noop": {self.shared_pool: False}, "guisetup.clicked": {self.shared_pool: False},
                                                            "getsetup.noop": {self.shared_pool: False}, "getsetup.clicked": {self.shared_pool: False},
                                                            "getsetup.guisetup.noop": {self.shared_pool: False},
                                                            "getsetup.guisetup.clicked": {self.shared_pool: False}})
@@ -4084,7 +4084,7 @@ class CartesianGraphTest(Test):
                                                          "getsetup.noop": {self.shared_pool: 0}, "getsetup.clicked": {self.shared_pool: 0},
                                                          "getsetup.guisetup.noop": {self.shared_pool: 0},
                                                          "getsetup.guisetup.clicked": {self.shared_pool: 0}})
-        DummyStateControl.asserted_states["unset"] = {"guisetup.noop": {self.shared_pool: 0},
+        DummyStateControl.asserted_states["unset"] = {"guisetup.noop": {self.shared_pool: 0}, "fedora.noop": {self.shared_pool: 0},
                                                       "getsetup.noop": {self.shared_pool: 0},
                                                       "ready": {self.shared_pool: 0}}
         DummyTestRun.asserted_tests = [
@@ -4129,22 +4129,22 @@ class CartesianGraphTest(Test):
             # automated setup of vm1 of Fedora variant, required via extra "tutorial_gui" restriction
             {"shortname": "^internal.automated.linux_virtuser.vm1.+Fedora", "vms": "^vm1$"},
             # GUI test for vm1 of Fedora variant which is not first (noop) dependency through vm2 of Win10 variant (produced with vm1 of CentOS variant)
-            {"shortname": "^leaves.tutorial_gui.client_noop.vm1.+Fedora.+vm2.+Win10", "vms": "^vm1 vm2$", "set_state_images_vm2": "guisetup.noop"},
+            {"shortname": "^leaves.tutorial_gui.client_noop.vm1.+Fedora.+vm2.+Win10", "vms": "^vm1 vm2$", "set_state_images_vm2": "fedora.noop"},
             # GUI test for vm1 of Fedora variant which is not first (noop) dependency through vm2 of Win7 variant (produced with vm1 of CentOS variant)
-            {"shortname": "^leaves.tutorial_gui.client_noop.vm1.+Fedora.+vm2.+Win7", "vms": "^vm1 vm2$", "set_state_images_vm2": "guisetup.noop"},
+            {"shortname": "^leaves.tutorial_gui.client_noop.vm1.+Fedora.+vm2.+Win7", "vms": "^vm1 vm2$", "set_state_images_vm2": "fedora.noop"},
 
             # second (clicked) explicit actual test of CentOS+Win7
             {"shortname": "^leaves.tutorial_get.explicit_clicked.vm1.+CentOS.+vm2.+Win7", "vms": "^vm1 vm2 vm3$", "get_state_images_vm2": "guisetup.clicked"},
 
             # GUI test for vm1 of Fedora variant which is not second (clicked) dependency through vm2 of Win10 variant (produced with vm1 of CentOS variant)
-            {"shortname": "^leaves.tutorial_gui.client_clicked.vm1.+Fedora.+vm2.+Win10", "vms": "^vm1 vm2$", "set_state_images_vm2": "guisetup.clicked"},
+            {"shortname": "^leaves.tutorial_gui.client_clicked.vm1.+Fedora.+vm2.+Win10", "vms": "^vm1 vm2$"},
             # GUI test for vm1 of Fedora variant which is not second (clicked) dependency through vm2 of Win7 variant (produced with vm1 of CentOS variant)
-            {"shortname": "^leaves.tutorial_gui.client_clicked.vm1.+Fedora.+vm2.+Win7", "vms": "^vm1 vm2$", "set_state_images_vm2": "guisetup.clicked"},
+            {"shortname": "^leaves.tutorial_gui.client_clicked.vm1.+Fedora.+vm2.+Win7", "vms": "^vm1 vm2$"},
         ]
 
         self._run_traversal(graph, self.config["param_dict"])
-        # expect four cleanups of four different variant product states
-        self.assertEqual(DummyStateControl.asserted_states["unset"]["guisetup.noop"][self.shared_pool], 4)
+        # expect two cleanups of two out of four different variant product states
+        self.assertEqual(DummyStateControl.asserted_states["unset"]["guisetup.noop"][self.shared_pool], 2)
         # expect two cleanups of two different variant product states (vm1 variant restricted)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["getsetup.noop"][self.shared_pool], 2)
 

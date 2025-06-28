@@ -303,8 +303,7 @@ class IntertestSetupTest(Test):
         # states after the updated path will be removed (default remove set is the entire graph)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["linux_virtuser"][self.shared_pool], 2*2)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["windows_virtuser"][self.shared_pool], 1*2)
-        # TODO: this state seems to be overwritten for both variants of vm1 and has to be separated between them
-        self.assertEqual(DummyStateControl.asserted_states["unset"]["guisetup.clicked"][self.shared_pool], 2*2)
+        self.assertEqual(DummyStateControl.asserted_states["unset"]["guisetup.clicked"][self.shared_pool], 1*2)
 
     def test_net_manipulation(self):
         """Test the general usage of all net manipulation tools."""
