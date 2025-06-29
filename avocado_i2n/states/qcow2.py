@@ -145,6 +145,8 @@ class QCOW2Backend(ImageStateBackend, RootSourcedStateBackend):
 
         All arguments match the base class.
         """
+        # TODO: this should be done each time we show states in order to
+        # decide whether to include a "root" state in the list/tree
         vm_name = params["vms"]
         image_name = params["image_name"]
         logging.debug(
