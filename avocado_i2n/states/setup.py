@@ -131,7 +131,7 @@ def show_states(run_params: Params, env: Env = None) -> list[str]:
     :param env: test environment or nothing if not needed
     :returns: list of detected states
     """
-    states = []
+    states = []  # TODO: return a tree structure (flatter for older backends)
     for state_params in _parametric_object_iteration(run_params):
         params_obj_name = state_params["object_name"]
         params_obj_type = state_params["object_type"]
