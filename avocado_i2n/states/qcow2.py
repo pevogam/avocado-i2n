@@ -26,6 +26,7 @@ INTERFACE
 
 """
 
+import glob
 import os
 import re
 import json
@@ -345,6 +346,14 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
         )
 
         cls.switch_off(switch, vm)
+        logging.debug("Cleaning previous pointer and auxiliary data")
+        QCOW2Backend._finalize(params, object)
+        auxiliary_files = os.path.join(
+            params["images_base_dir"], "*_" + params["image_name"] + "_qcow2_*"
+        )
+        for auxiliary_file in glob.glob(auxiliary_files):
+            os.unlink(auxiliary_file)
+        os.makedirs(params["images_base_dir"], exist_ok=True)
 
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, vm_id)
@@ -378,6 +387,8 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
         )
 
         cls.switch_off(switch, vm)
+        if not QCOW2Backend._check(params, object):
+            raise RuntimeError(f"Missing head pointer image to commit as {state}")
 
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, vm_id)
@@ -409,7 +420,6 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
                 logging.info(
                     f"Overwriting pre-existing backing state {state} via forward replacement"
                 )
-                os.makedirs(image_dir, exist_ok=True)
                 os.unlink(state_file)
                 shutil.copy(qemu_img.image_filename, state_file)
             else:
@@ -417,7 +427,6 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
                     "Cannot perform nontrivial pre-existing state overwrite for qcow2ext"
                 )
         else:
-            os.makedirs(image_dir, exist_ok=True)
             shutil.copy(qemu_img.image_filename, state_file)
 
         cls.switch_on(switch, vm)
@@ -441,6 +450,21 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
         )
 
         cls.switch_off(switch, vm)
+        logging.debug("Cleaning previous pointer and auxiliary data")
+        QCOW2Backend._finalize(params, object)
+        auxiliary_files = os.path.join(
+            params["images_base_dir"], "*_" + params["image_name"] + "_qcow2_*"
+        )
+        for auxiliary_file in glob.glob(auxiliary_files):
+            os.unlink(auxiliary_file)
+        try:
+            os.rmdir(params["images_base_dir"])
+        except (OSError, FileNotFoundError) as error:
+            logging.warning(
+                "Could not remove images base directory %s: %s",
+                params["images_base_dir"],
+                error,
+            )
 
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, vm_id)
@@ -459,7 +483,14 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
 
         All arguments match the base class.
         """
-        return QCOW2Backend._check(params, object)
+        vm_id, image_name = params["object_id"], params["images"]
+        state_dir = params["swarm_pool"]
+        vm_dir = os.path.join(state_dir, vm_id)
+        image_dir = os.path.join(vm_dir, image_name)
+        if not os.path.exists(image_dir):
+            logging.info("The base directory for the image %s is missing", image_name)
+            return False
+        return True
 
     @classmethod
     def initialize(cls, params: Params, object: Any = None) -> None:
@@ -468,7 +499,12 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
 
         All arguments match the base class.
         """
-        QCOW2Backend._initialize(params, object)
+        vm_id, image_name = params["object_id"], params["images"]
+        state_dir = params["swarm_pool"]
+        vm_dir = os.path.join(state_dir, vm_id)
+        image_dir = os.path.join(vm_dir, image_name)
+        logging.info("Creating base directory as a shared initialization precondition")
+        os.makedirs(image_dir, exist_ok=True)
 
     @classmethod
     def finalize(cls, params: Params, object: Any = None) -> None:
@@ -477,7 +513,12 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
 
         All arguments match the base class.
         """
-        QCOW2Backend._finalize(params, object)
+        vm_id, image_name = params["object_id"], params["images"]
+        state_dir = params["swarm_pool"]
+        vm_dir = os.path.join(state_dir, vm_id)
+        image_dir = os.path.join(vm_dir, image_name)
+        logging.info("Removing base directory as a shared finalization postcondition")
+        os.rmdir(image_dir)
 
 
 class QCOW2VTBackend(QCOW2Backend):
