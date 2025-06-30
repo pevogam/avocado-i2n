@@ -85,7 +85,10 @@ echo
 echo "Check if all containers have identical and synced states after the run"
 containers="$(printf $test_slots | sed "s/,/ /g" | sed "s/net/10/g")"
 for cid in $containers; do
-    diff -r /$ims/c101/rootfs/$ims /$ims/c$cid/rootfs/$ims -x el8-64* -x f40-64* -x win10-64* -x vm3 || (echo "Different states found at ${cid}" && exit 1)
+    diff -r /$ims/c101/rootfs/$ims/swarm /$ims/c$cid/rootfs/$ims/swarm || (echo "Different shared states found at ${cid}" && exit 1)
+    diff <(cd /$ims/c101/rootfs/$ims/vm3 && find . | sort) \
+         <(cd /$ims/c$cid/rootfs/$ims/vm3 && find . | sort) \
+    || (echo "Different synced states found at ${cid}" && exit 1)
 done
 # verify that either vm1/vm2 shared pool doesn't exist or is empty for the validity of our tests
 ls -A1q /mnt/local/images/shared/vm1-* 2>/dev/null | grep -q . && (echo "Unexpected vm1 images in the shared pool" && exit 1)
