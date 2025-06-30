@@ -34,19 +34,27 @@ from virttest import env_process
 from virttest.virt_vm import VMCreateError
 from virttest.utils_params import Params
 
+from .composition import VMStateBackend
 from .pool import SourcedStateBackend
 
 
 logging = log.getLogger("avocado.job." + __name__)
 
 
-class RamfileBackend(SourcedStateBackend):
+class RamfileBackend(SourcedStateBackend, VMStateBackend):
     """Backend manipulating vm states as ram dump files."""
-
-    image_state_backend = None
 
     @classmethod
     def _show(cls, params: Params, object: Any = None) -> list[str]:
+        """
+        Return a list of available states of a specific type.
+
+        All arguments match the base class.
+        """
+        return cls._show_driver(params, object)
+
+    @classmethod
+    def _show_driver(cls, params: Params, object: Any = None) -> list[str]:
         """
         Return a list of available states of a specific type.
 
@@ -59,18 +67,8 @@ class RamfileBackend(SourcedStateBackend):
         vm_dir = os.path.join(state_dir, params["object_id"])
         snapshots = os.listdir(vm_dir)
 
-        images_states = set()
-        for image_name in params.objects("images"):
-            image_params = params.object_params(image_name)
-            # TODO: refine method arguments by providing at least the image name directly
-            image_params["images"] = image_name
-            image_snapshots = cls.image_state_backend.show(image_params, object=object)
-            if len(images_states) == 0:
-                images_states = set(image_snapshots)
-            else:
-                images_states = images_states.intersection(image_snapshots)
-
         states = []
+        images_states = super(SourcedStateBackend, cls).show(params, object=object)
         for snapshot in snapshots:
             if not snapshot.endswith(".state"):
                 continue
@@ -92,21 +90,16 @@ class RamfileBackend(SourcedStateBackend):
 
         All arguments match the base class.
         """
-        vm, vm_name = object, params["vms"]
-        logging.info("Reusing vm state '%s' of %s", params["get_state"], vm_name)
+        super(SourcedStateBackend, cls).get(params, object=object)
 
-        if vm is None:
-            raise ValueError("Need an environmental object to restore from file")
-        if vm.is_alive():
-            vm.destroy(gracefully=False)
+    @classmethod
+    def _get_driver(cls, params: Params, object: Any = None) -> None:
+        """
+        Retrieve a state disregarding the current changes.
 
-        for image_name in params.objects("images"):
-            image_params = params.object_params(image_name)
-            # TODO: refine method arguments by providing at least the image name directly
-            image_params["images"] = image_name
-            image_params["get_switch"] = "none"
-            cls.image_state_backend.get(image_params, vm)
-
+        All arguments match the base class.
+        """
+        vm = object
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, params["object_id"])
         state_file = os.path.join(vm_dir, params["get_state"] + ".state")
@@ -120,14 +113,19 @@ class RamfileBackend(SourcedStateBackend):
 
         All arguments match the base class.
         """
-        vm, vm_name = object, params["vms"]
-        logging.info("Setting vm state '%s' of %s", params["set_state"], vm_name)
+        super(SourcedStateBackend, cls).set(params, object=object)
 
-        if vm is None or not vm.is_alive():
-            raise RuntimeError("No booted vm and thus vm state to set")
+    @classmethod
+    def _set_driver(cls, params: Params, object: Any = None) -> None:
+        """
+        Store a state saving the current changes.
 
-        vm.pause()
+        All arguments match the base class.
 
+        This only sets a state without necessarily restoring which could
+        be invoked separately.
+        """
+        vm = object
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, params["object_id"])
         state_file = os.path.join(vm_dir, params["set_state"] + ".state")
@@ -136,19 +134,6 @@ class RamfileBackend(SourcedStateBackend):
         vm.save_to_file(state_file)
         vm.destroy(gracefully=False)
 
-        for image_name in params.objects("images"):
-            image_params = params.object_params(image_name)
-            # TODO: refine method arguments by providing at least the image name directly
-            image_params["images"] = image_name
-            image_params["set_switch"] = "none"
-            cls.image_state_backend.set(image_params, vm)
-
-        # BUG: because the built-in functionality uses system_reset
-        # which leads to unclean file systems in some cases it is
-        # better to restore from the saved state
-        vm.restore_from_file(state_file)
-        vm.resume(timeout=3)
-
     @classmethod
     def _unset(cls, params: Params, object: Any = None) -> None:
         """
@@ -156,16 +141,15 @@ class RamfileBackend(SourcedStateBackend):
 
         All arguments match the base class.
         """
-        vm, vm_name = object, params["vms"]
-        logging.info("Removing vm state '%s' of %s", params["unset_state"], vm_name)
+        super(SourcedStateBackend, cls).unset(params, object=object)
 
-        for image_name in params.objects("images"):
-            image_params = params.object_params(image_name)
-            # TODO: refine method arguments by providing at least the image name directly
-            image_params["images"] = image_name
-            image_params["unset_switch"] = "none"
-            cls.image_state_backend.unset(image_params, vm)
+    @classmethod
+    def _unset_driver(cls, params: Params, object: Any = None) -> None:
+        """
+        Remove a state with previous changes.
 
+        All arguments match the base class.
+        """
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, params["object_id"])
         state_file = os.path.join(vm_dir, params["unset_state"] + ".state")
@@ -178,22 +162,17 @@ class RamfileBackend(SourcedStateBackend):
 
         All arguments match the base class.
         """
-        vm_name = params["vms"]
-        logging.debug("Checking whether %s's root state is fully available", vm_name)
-
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, params["object_id"])
         if not os.path.exists(vm_dir):
+            vm_name = params["vms"]
+            logging.debug("Checking whether %s's preconditions are satisfied", vm_name)
             logging.info(
                 "The base directory for the virtual machine %s is missing", vm_name
             )
             return False
 
-        for image_name in params.objects("images"):
-            image_params = params.object_params(image_name)
-            if not RamfileBackend.image_state_backend.check(image_params):
-                return False
-        return True
+        return super(SourcedStateBackend, cls).check(params, object=object)
 
     @classmethod
     def initialize(cls, params: Params, object: Any = None) -> None:
@@ -202,19 +181,11 @@ class RamfileBackend(SourcedStateBackend):
 
         All arguments match the base class.
         """
-        vm_name = params["vms"]
-
+        super(SourcedStateBackend, cls).initialize(params, object=object)
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, params["object_id"])
-        logging.info("Creating base directory as a shared initialization precondition")
+        logging.info("Creating base directory for vm states %s", vm_dir)
         os.makedirs(vm_dir, exist_ok=True)
-
-        for image_name in params.objects("images"):
-            logging.info(
-                f"Creating image {image_name} in order to boot {vm_name}",
-            )
-            image_params = params.object_params(image_name)
-            RamfileBackend.image_state_backend.initialize(image_params)
 
     @classmethod
     def finalize(cls, params: Params, object: Any = None) -> None:
@@ -223,16 +194,8 @@ class RamfileBackend(SourcedStateBackend):
 
         All arguments match the base class.
         """
-        vm_name = params["vms"]
-
-        for image_name in params.objects("images"):
-            logging.info(
-                f"Removing image {image_name} in order to remove all vm states of {vm_name}",
-            )
-            image_params = params.object_params(image_name)
-            RamfileBackend.image_state_backend.finalize(image_params)
-
+        super(SourcedStateBackend, cls).finalize(params, object=object)
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, params["object_id"])
-        logging.info("Removing base directory as a shared finalization postcondition")
+        logging.info("Removing base directory for vm states %s", vm_dir)
         os.rmdir(vm_dir)

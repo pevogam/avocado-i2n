@@ -8,18 +8,18 @@ import contextlib
 
 from avocado import Test
 from avocado.core import exceptions
-from avocado.utils import process
 from virttest import utils_params
 
 import unittest_importer
 # use old name to reduce amount of changes in the unit tests
 from avocado_i2n.states import setup as ss
+from avocado_i2n.states import composition
+from avocado_i2n.states import pool
 from avocado_i2n.states import qcow2
 from avocado_i2n.states import lvm
 from avocado_i2n.states import ramfile
 from avocado_i2n.states import lxc
 from avocado_i2n.states import btrfs
-from avocado_i2n.states import pool
 from avocado_i2n.states import vmnet
 
 
@@ -59,187 +59,114 @@ class MockDriver(unittest.TestCase):
         mock_driver = mock.MagicMock()
         self._reset_extra_mocks()
         backend = self.state_backends[state_type]
-        if backend == "lvm":
-            mock_driver.lv_check.return_value = root_exists
-            mock_driver.lv_list.return_value = state_names
-            with mock.patch('avocado_i2n.states.lvm.lv_utils', mock_driver):
-                yield mock_driver
-        elif backend in ["qcow2", "qcow2vt"]:
-            self.exist_switch = root_exists
-            output = ""
-            for state in state_names:
-                size = "0 B" if state_type == "image" else "1 GiB"
-                output += f"0         {state}         {size} 0000-00-00 00:00:00   00:00:00.000\n"
-            mock_driver.return_value.snapshot_list.return_value = output
-            with mock.patch('avocado_i2n.states.qcow2.QemuImg', mock_driver):
-                yield mock_driver
-        elif backend == "qcow2ext":
-            self.mock_vms["vm1"].is_alive.return_value = False
-            mock_driver.listdir.return_value = [s + ".qcow2" for s in state_names]
-            mock_driver.stat.return_value.st_size = 0
-            mock_driver.path.join = os.path.join
-            mock_driver.path.dirname = os.path.dirname
-            mock_driver.path.exists = self.mock_file_exists
-            mock_driver.makedirs = mock.MagicMock()
-            mock_driver.rmdir = mock.MagicMock()
-            self.exist_switch = root_exists
-            class QemuImgMock():
-                def __init__(self, params, root_dir, tag):
-                    self.image_filename = os.path.join(root_dir, tag)
-            with mock.patch('avocado_i2n.states.qcow2.QemuImg', QemuImgMock):
-                with mock.patch('avocado_i2n.states.qcow2.env_process', mock.MagicMock()):
-                    with mock.patch('avocado_i2n.states.qcow2.os', mock_driver):
-                        yield mock_driver
-        elif backend == "ramfile":
-            ramfile.RamfileBackend.image_state_backend.show.return_value = state_names
-            mock_driver.listdir.return_value = [s + ".state" for s in state_names]
-            mock_driver.stat.return_value.st_size = 0
-            mock_driver.path.join = os.path.join
-            mock_driver.path.exists = self.mock_file_exists
-            self.exist_switch = root_exists
-            with mock.patch('avocado_i2n.states.ramfile.os', mock_driver):
-                yield mock_driver
-        else:
-            raise ValueError(f"Unsupported backend for testing {backend}")
+        backend_map = {
+            "lvm" : lvm.LVMBackend,
+            "qcow2" : qcow2.QCOW2Backend,
+            "qcow2ext" : qcow2.QCOW2ExtBackend,
+            "qcow2vt" : qcow2.QCOW2VTBackend,
+            "ramfile" : ramfile.RamfileBackend
+        }
+        backend_class = backend_map[backend]
+        with mock.patch.object(backend_class, "_show_driver") as mock_show, \
+                mock.patch.object(backend_class, "_get_driver") as mock_get, \
+                mock.patch.object(backend_class, "_set_driver") as mock_set, \
+                mock.patch.object(backend_class, "_unset_driver") as mock_unset, \
+                mock.patch.object(backend_class, "check") as mock_check, \
+                mock.patch.object(backend_class, "initialize") as mock_initalize, \
+                mock.patch.object(backend_class, "finalize") as mock_finalize:
+            mock_driver = {
+                "show": mock_show,
+                "get": mock_get,
+                "set": mock_set,
+                "unset": mock_unset,
+                "check": mock_check,
+                "initialize": mock_initalize,
+                "finalize": mock_finalize,
+            }
+            mock_driver["show"].return_value = state_names
+            mock_driver["check"].return_value = root_exists
+            yield mock_driver
 
     def assert_show(self, mock_driver, _state_names, state_type):
-        backend = self.state_backends[state_type]
-        if backend == "lvm":
-            mock_driver.lv_list.assert_called_once_with("disk_vm1")
-        elif backend in ["qcow2", "qcow2vt"]:
-            mock_driver.return_value.snapshot_list.assert_called_once_with(force_share=True)
-        elif backend == "qcow2ext":
-            mock_driver.listdir.assert_called_once_with("/images/vm1-abc.def/image1")
-        elif backend == "ramfile":
-            mock_driver.listdir.assert_called_once_with("/images/vm1-abc.def")
-        else:
-            raise ValueError(f"Unsupported backend for testing {backend}")
+        mock_driver["show"].assert_called_once()
+        call_params = mock_driver["show"].call_args_list[0].args[0]
+        if state_type == "image":
+            self.assertEqual(call_params["object_name"], "net1/vm1/image1")
+            self.assertEqual(call_params["object_type"], "nets/vms/images")
+        elif state_type == "vm":
+            self.assertEqual(call_params["object_name"], "net1/vm1")
+            self.assertEqual(call_params["object_type"], "nets/vms")
 
     def assert_get(self, mock_driver, state_name, state_type, action_type):
-        backend = self.state_backends[state_type]
-        if backend == "lvm":
-            mock_driver.lv_check.assert_called_with("disk_vm1", "LogVol")
-            if action_type == 1:
-                mock_driver.lv_remove.assert_called_once_with('disk_vm1', 'current_state')
-                mock_driver.lv_take_snapshot.assert_called_once_with('disk_vm1', state_name, 'current_state')
-            else:
-                mock_driver.lv_remove.assert_not_called()
-                mock_driver.lv_take_snapshot.assert_not_called()
-        elif backend in ["qcow2", "qcow2vt"]:
-            driver_instance = mock_driver.return_value
-            driver_instance.snapshot_list.assert_called_once_with(force_share=True)
-            if action_type == 1 and state_type == "image":
-                mock_driver.assert_called()
-                second_creation_call_params = mock_driver.call_args_list[-2].args[0]
-                self.assertEqual(second_creation_call_params["get_state"], state_name)
-                driver_instance.snapshot_apply.assert_called_once_with()
-            elif action_type == 1 and state_type == "vm":
-                self.mock_vms["vm1"].loadvm.assert_called_once_with(state_name)
-            elif state_type == "image":
-                driver_instance.assert_not_called()
-            else:
-                self.mock_vms["vm1"].loadvm.assert_not_called()
-        elif backend == "qcow2ext":
-            # would have to mock a different dependency (QemuImg) here
-            raise NotImplementedError("Not isolated backend - test via integration")
-        elif backend == "ramfile":
-            # TODO: cannot assert state_name as we need more isolated testing here
-            mock_driver.listdir.assert_called_with(f"/images/vm1-abc.def")
-            if action_type == 1:
-                self.mock_vms["vm1"].restore_from_file.assert_called_once_with(f"/images/vm1-abc.def/{state_name}.state")
-            else:
-                self.mock_vms["vm1"].restore_from_file.assert_not_called()
+        mock_driver["check"].assert_called_once()
+        mock_driver["set"].assert_not_called()
+        mock_driver["unset"].assert_not_called()
+        if action_type == 1:
+            mock_driver["get"].assert_called_once()
+            call_params = mock_driver["get"].call_args_list[0].args[0]
+            if state_type == "image":
+                self.assertEqual(call_params["object_name"], "net1/vm1/image1")
+                self.assertEqual(call_params["object_type"], "nets/vms/images")
+            elif state_type == "vm":
+                self.assertEqual(call_params["object_name"], "net1/vm1")
+                self.assertEqual(call_params["object_type"], "nets/vms")
+            self.assertEqual(call_params["get_state"], state_name)
         else:
-            raise ValueError(f"Unsupported backend for testing {backend}")
+            mock_driver["get"].assert_not_called()
 
     def assert_set(self, mock_driver, state_name, state_type, action_type):
         backend = self.state_backends[state_type]
-        if backend == "lvm":
-            if action_type == 1:
-                mock_driver.lv_check.assert_called_with("disk_vm1", "LogVol")
-                mock_driver.lv_remove.assert_not_called()
-                mock_driver.lv_take_snapshot.assert_called_once_with('disk_vm1', 'current_state', state_name)
-            elif action_type == 2:
-                mock_driver.lv_check.assert_called_with("disk_vm1", "LogVol")
-                mock_driver.lv_remove.assert_called_once_with('disk_vm1', state_name)
-                mock_driver.lv_take_snapshot.assert_called_once_with('disk_vm1', 'current_state', state_name)
-            else:
-                mock_driver.lv_remove.assert_not_called()
-                mock_driver.lv_take_snapshot.assert_not_called()
-        elif backend in ["qcow2", "qcow2vt"]:
-            mock_driver.return_value.snapshot_list.assert_called_once_with(force_share=True)
-            if action_type == 1 and state_type == "image":
-                mock_driver.assert_called()
-                second_creation_call_params = mock_driver.call_args_list[-2].args[0]
-                self.assertEqual(second_creation_call_params["set_state"], state_name)
-                mock_driver.return_value.snapshot_create.assert_called_once_with()
-            elif action_type == 2 and state_type == "image":
-                mock_driver.assert_called()
-                second_creation_call_params = mock_driver.call_args_list[-2].args[0]
-                self.assertEqual(second_creation_call_params["set_state"], state_name)
-                mock_driver.return_value.snapshot_del.assert_called_once_with()
-                mock_driver.return_value.snapshot_create.assert_called_once_with()
-            elif state_type == "image":
-                mock_driver.return_value.assert_not_called()
-            elif action_type in [1, 2] and state_type == "vm":
-                self.mock_vms["vm1"].savevm.assert_called_once_with(state_name)
-            else:
-                self.mock_vms["vm1"].savevm.assert_not_called()
-        elif backend == "qcow2ext":
-            # would have to mock a different dependency (shutil.copy) here
-            raise NotImplementedError("Not isolated backend - test via integration")
-        elif backend == "ramfile":
-            if action_type in [1, 2]:
-                # TODO: cannot assert state_name as we need more isolated testing here
-                mock_driver.listdir.assert_called_once_with(f"/images/vm1-abc.def")
-                self.mock_vms["vm1"].save_to_file.assert_called_once_with(f"/images/vm1-abc.def/{state_name}.state")
-            else:
-                self.mock_vms["vm1"].save_to_file.assert_not_called()
+        mock_driver["check"].assert_called_once()
+        mock_driver["get"].assert_not_called()
+        if action_type == 1:
+            mock_driver["unset"].assert_not_called()
+            mock_driver["set"].assert_called_once()
+            call_params = mock_driver["set"].call_args_list[0].args[0]
+            if state_type == "image":
+                self.assertEqual(call_params["object_name"], "net1/vm1/image1")
+                self.assertEqual(call_params["object_type"], "nets/vms/images")
+            elif state_type == "vm":
+                self.assertEqual(call_params["object_name"], "net1/vm1")
+                self.assertEqual(call_params["object_type"], "nets/vms")
+            self.assertEqual(call_params["set_state"], state_name)
+        elif action_type == 2:
+            if backend == "lvm":
+                mock_driver["unset"].assert_called_once()
+                call_params = mock_driver["unset"].call_args_list[0].args[0]
+                self.assertEqual(call_params["object_name"], "net1/vm1/image1")
+                self.assertEqual(call_params["object_type"], "nets/vms/images")
+                self.assertEqual(call_params["unset_state"], state_name)
+            mock_driver["set"].assert_called_once()
+            call_params = mock_driver["set"].call_args_list[0].args[0]
+            if state_type == "image":
+                self.assertEqual(call_params["object_name"], "net1/vm1/image1")
+                self.assertEqual(call_params["object_type"], "nets/vms/images")
+            elif state_type == "vm":
+                self.assertEqual(call_params["object_name"], "net1/vm1")
+                self.assertEqual(call_params["object_type"], "nets/vms")
+            self.assertEqual(call_params["set_state"], state_name)
         else:
-            raise ValueError(f"Unsupported backend for testing {backend}")
+            mock_driver["unset"].assert_not_called()
+            mock_driver["set"].assert_not_called()
 
     def assert_unset(self, mock_driver, state_name, state_type, action_type):
-        backend = self.state_backends[state_type]
-        if backend == "lvm":
-            mock_driver.lv_check.assert_called_with("disk_vm1", "LogVol")
-            if action_type == 1:
-                mock_driver.lv_remove.assert_called_once_with("disk_vm1", state_name)
-                mock_driver.lv_take_snapshot.assert_not_called()
-            else:
-                mock_driver.lv_remove.assert_not_called()
-                mock_driver.lv_take_snapshot.assert_not_called()
-        elif backend in ["qcow2", "qcow2vt"]:
-            mock_driver.return_value.snapshot_list.assert_called_once_with(force_share=True)
-            if action_type == 1:
-                mock_driver.assert_called()
-                second_creation_call_params = mock_driver.call_args_list[-2].args[0]
-                self.assertEqual(second_creation_call_params["unset_state"], state_name)
-                mock_driver.return_value.snapshot_del.assert_called_once_with()
-            else:
-                mock_driver.return_value.assert_not_called()
-        elif backend == "qcow2ext":
-            # TODO: cannot assert state_name as we need more isolated testing here
-            mock_driver.listdir.assert_called_once_with(f"/images/vm1-abc.def/image1")
-            if action_type == 1:
-                mock_driver.unlink.assert_called_once_with(f"/images/vm1-abc.def/image1/{state_name}.qcow2")
-            else:
-                mock_driver.unlink.assert_not_called()
-        elif backend == "ramfile":
-            self.mock_vms["vm1"].is_alive.assert_not_called()
-            # TODO: cannot assert state_name as we need more isolated testing here
-            mock_driver.listdir.assert_called_once_with(f"/images/vm1-abc.def")
-            if action_type == 1:
-                mock_driver.unlink.assert_called_once_with(f"/images/vm1-abc.def/{state_name}.state")
-            else:
-                mock_driver.unlink.assert_not_called()
+        mock_driver["check"].assert_called_once()
+        mock_driver["get"].assert_not_called()
+        mock_driver["set"].assert_not_called()
+        if action_type == 1:
+            mock_driver["unset"].assert_called_once()
+            call_params = mock_driver["unset"].call_args_list[0].args[0]
+            if state_type == "image":
+                self.assertEqual(call_params["object_name"], "net1/vm1/image1")
+                self.assertEqual(call_params["object_type"], "nets/vms/images")
+            elif state_type == "vm":
+                self.assertEqual(call_params["object_name"], "net1/vm1")
+                self.assertEqual(call_params["object_type"], "nets/vms")
+            self.assertEqual(call_params["unset_state"], state_name)
         else:
-            raise ValueError(f"Unsupported backend for testing {backend}")
+            mock_driver["unset"].assert_not_called()
 
 
-# TODO: keep these boundary tests until they are useful and the state backends
-# they cover still supported, any newly introduced state backends should be
-# covered by actual integration tests though (currently qcow2ext and some
-# repeated but highly refurbished backends here)
 @mock.patch('avocado_i2n.states.lvm.os.mkdir', mock.Mock(return_value=0))
 @mock.patch('avocado_i2n.states.lvm.os.makedirs', mock.Mock(return_value=0))
 @mock.patch('avocado_i2n.states.lvm.os.rmdir', mock.Mock(return_value=0))
@@ -255,8 +182,8 @@ class StatesBoundaryTest(Test):
                        "lxc": lxc.LXCBackend, "btrfs": btrfs.BtrfsBackend,
                        "qcow2vt": qcow2.QCOW2VTBackend, "ramfile": ramfile.RamfileBackend,
                        "vmnet": vmnet.VMNetBackend,
-                       "mock": mock.MagicMock(spec=ss.StateBackend)}
-        ramfile.RamfileBackend.image_state_backend = mock.MagicMock()
+                       "mock": mock.MagicMock(spec=composition.StateBackend)}
+        composition.VMStateBackend.image_state_backend = mock.MagicMock()
 
         self.run_params = utils_params.Params()
         self.run_params["nets"] = "net1"
@@ -441,7 +368,11 @@ class StatesBoundaryTest(Test):
         self.run_params["swarm_pool"] = "/some/swarm2"
         with self.driver.mock_show(["launch"], backend_type) as driver:
             states = ss.show_states(self.run_params, self.env)
-            driver.listdir.assert_called_once_with("/some/swarm2/vm1-abc.def/image1")
+            driver["show"].assert_called_once()
+            call_params = driver["show"].call_args_list[0].args[0]
+            self.assertEqual(call_params["object_name"], "net1/vm1/image1")
+            self.assertEqual(call_params["object_type"], "nets/vms/images")
+            self.assertEqual(call_params["swarm_pool"], "/some/swarm2")
         # TODO: we cannot guarantee the order for pool backends and we don't attribute meaning to it
         self.assertEqual(set(states), set(["launch", "root"]))
 
@@ -460,7 +391,12 @@ class StatesBoundaryTest(Test):
         self.run_params["swarm_pool"] = "/some/swarm2"
         with self.driver.mock_show(["launch"], backend_type) as driver:
             states = ss.show_states(self.run_params, self.env)
-            driver.listdir.assert_called_once_with("/some/swarm2/vm1-abc.def")
+            driver["show"].assert_called_once()
+            call_params = driver["show"].call_args_list[0].args[0]
+            self.assertEqual(call_params["object_name"], "net1/vm1")
+            self.assertEqual(call_params["object_type"], "nets/vms")
+            self.assertEqual(call_params["object_id"], "vm1-abc.def")
+            self.assertEqual(call_params["swarm_pool"], "/some/swarm2")
         # TODO: we cannot guarantee the order for pool backends and we don't attribute meaning to it
         self.assertEqual(set(states), set(["launch", "root"]))
 
@@ -475,6 +411,12 @@ class StatesBoundaryTest(Test):
         # use a nondefault policy that doesn't raise any errors here
         self.run_params["get_mode_vm1"] = "riri"
         self._test_get_state("qcow2")
+
+    def test_get_image_qcow2ext(self):
+        """Test that state getting with the QCOW2 external state backend works with available root."""
+        # use a nondefault policy that doesn't raise any errors here
+        self.run_params["get_mode_vm1"] = "riri"
+        self._test_get_state("qcow2ext")
 
     def test_get_vm_qcow2(self):
         """Test that state getting with the QCOW2VT backend works with available root."""
@@ -495,6 +437,10 @@ class StatesBoundaryTest(Test):
     def test_set_image_qcow2(self):
         """Test that state setting with the QCOW2 backend works with available root."""
         self._test_set_state("qcow2")
+
+    def test_set_image_qcow2ext(self):
+        """Test that state setting with the QCOW2 external state backend works with available root."""
+        self._test_set_state("qcow2ext")
 
     def test_set_vm_qcow2(self):
         """Test that state setting with the QCOW2VT backend works with available root."""
@@ -545,13 +491,28 @@ class StatesBoundaryTest(Test):
         # assert root state is correctly detected
         with self.driver.mock_show([], backend_type, True) as driver:
             states = ss.show_states(self.run_params, self.env)
-            driver.lv_check.assert_called_once_with("disk_vm1", "LogVol")
+            driver["check"].assert_called_once()
+            call_params = driver["check"].call_args_list[0].args[0]
+            self.assertEqual(call_params["vms"], "vm1")
+            self.assertEqual(call_params["image_name"], "image")
+            self.assertEqual(call_params["vg_name"], "disk_vm1")
+            self.assertEqual(call_params["lv_name"], "LogVol")
+            driver["show"].assert_called_once()
+            call_params = driver["show"].call_args_list[0].args[0]
+            self.assertEqual(call_params["object_name"], "net1/vm1/image1")
+            self.assertEqual(call_params["object_type"], "nets/vms/images")
         self.assertEqual(states, ["root"])
 
         # assert root state is correctly not detected
         with self.driver.mock_show([], backend_type, False) as driver:
             states = ss.show_states(self.run_params, self.env)
-            driver.lv_check.assert_called_once_with("disk_vm1", "LogVol")
+            driver["check"].assert_called_once()
+            call_params = driver["check"].call_args_list[0].args[0]
+            self.assertEqual(call_params["vms"], "vm1")
+            self.assertEqual(call_params["image_name"], "image")
+            self.assertEqual(call_params["vg_name"], "disk_vm1")
+            self.assertEqual(call_params["lv_name"], "LogVol")
+            driver["show"].assert_not_called()
         self.assertEqual(states, [])
 
     def test_check_image_qcow2(self):
@@ -568,11 +529,61 @@ class StatesBoundaryTest(Test):
         # assert root state is correctly detected
         with self.driver.mock_show([], backend_type, True) as driver:
             states = ss.show_states(self.run_params, self.env)
+            # root sourced state backend performs remote and local checks (not once)
+            driver["check"].assert_called()
+            call_params = driver["check"].call_args_list[0].args[0]
+            self.assertEqual(call_params["images_base_dir"], "/images/vm1")
+            self.assertEqual(call_params["vms"], "vm1")
+            self.assertEqual(call_params["image_name"], "vm1/image1")
+            self.assertEqual(call_params["image_format"], "qcow2")
+            driver["show"].assert_called()
+            call_params = driver["show"].call_args_list[0].args[0]
+            self.assertEqual(call_params["object_name"], "net1/vm1/image1")
+            self.assertEqual(call_params["object_type"], "nets/vms/images")
         self.assertEqual(states, ["root", "root"])
 
         # assert root state is correctly not detected
         with self.driver.mock_show([], backend_type, False) as driver:
             states = ss.show_states(self.run_params, self.env)
+            driver["check"].assert_called()
+            call_params = driver["check"].call_args_list[0].args[0]
+            self.assertEqual(call_params["images_base_dir"], "/images/vm1")
+            self.assertEqual(call_params["vms"], "vm1")
+            self.assertEqual(call_params["image_name"], "vm1/image1")
+            self.assertEqual(call_params["image_format"], "qcow2")
+            driver["show"].assert_not_called()
+        self.assertEqual(states, [])
+
+    def test_check_image_qcow2ext(self):
+        """Test that root checking with the QCOW2 external state backend works."""
+        backend = "qcow2ext"
+        backend_type = self._prepare_driver_from_backend(backend)
+        # keep a passive precondition behavior for this test
+        self.run_params["show_mode"] = "ri"
+
+        # assert root state is correctly detected
+        with self.driver.mock_show([], backend_type, True) as driver:
+            states = ss.show_states(self.run_params, self.env)
+            driver["check"].assert_called_once()
+            call_params = driver["check"].call_args_list[0].args[0]
+            self.assertEqual(call_params["images"], "image1")
+            self.assertEqual(call_params["object_id"], "vm1-abc.def")
+            self.assertEqual(call_params["swarm_pool"], "/images")
+            driver["show"].assert_called_once()
+            call_params = driver["show"].call_args_list[0].args[0]
+            self.assertEqual(call_params["object_name"], "net1/vm1/image1")
+            self.assertEqual(call_params["object_type"], "nets/vms/images")
+        self.assertEqual(states, ["root"])
+
+        # assert root state is correctly not detected
+        with self.driver.mock_show([], backend_type, False) as driver:
+            states = ss.show_states(self.run_params, self.env)
+            driver["check"].assert_called_once()
+            call_params = driver["check"].call_args_list[0].args[0]
+            self.assertEqual(call_params["images"], "image1")
+            self.assertEqual(call_params["object_id"], "vm1-abc.def")
+            self.assertEqual(call_params["swarm_pool"], "/images")
+            driver["show"].assert_not_called()
         self.assertEqual(states, [])
 
     def test_check_vm_qcow2(self):
@@ -589,11 +600,17 @@ class StatesBoundaryTest(Test):
         # assert root state is correctly detected
         with self.driver.mock_show([], backend_type, True) as driver:
             states = ss.show_states(self.run_params, self.env)
+            call_params = driver["check"].call_args_list[0].args[0]
+            self.assertEqual(call_params["images"], "image1 image2")
+            self.assertEqual(call_params["vms"], "vm1")
         self.assertEqual(states, ["root"])
 
         # assert root state is correctly not detected
         with self.driver.mock_show([], backend_type, False) as driver:
             states = ss.show_states(self.run_params, self.env)
+            call_params = driver["check"].call_args_list[0].args[0]
+            self.assertEqual(call_params["images"], "image1 image2")
+            self.assertEqual(call_params["vms"], "vm1")
         self.assertEqual(states, [])
 
     def test_check_vm_ramfile(self):
@@ -608,89 +625,67 @@ class StatesBoundaryTest(Test):
         self.run_params["show_mode"] = "ri"
 
         # assert root state is correctly detected
-        for image_format in ["qcow2", "raw", "something-else"]:
-            with self.subTest(f"Test root checking with ramfile using image format {image_format}"):
-                self.run_params["image_format"] = image_format
-                with self.driver.mock_show([], backend_type, True) as driver:
-                    file_suffix = f".{image_format}" if image_format != "raw" else ""
-                    self.driver.exist_lambda = lambda filename: filename.endswith(file_suffix) or filename.endswith("vm1-abc.def")
-                    states = ss.show_states(self.run_params, self.env)
-                self.assertEqual(states, ["root"])
+        with self.driver.mock_show([], backend_type, True) as driver:
+            states = ss.show_states(self.run_params, self.env)
+            call_params = driver["check"].call_args_list[0].args[0]
+            self.assertEqual(call_params["images"], "image1 image2")
+            self.assertEqual(call_params["vms"], "vm1")
+            self.assertEqual(call_params["object_id"], "vm1-abc.def")
+            self.assertEqual(call_params["swarm_pool"], "/images")
+        self.assertEqual(states, ["root"])
 
         # assert root state is correctly not detected
         with self.driver.mock_show([], backend_type, False) as driver:
             states = ss.show_states(self.run_params, self.env)
+            call_params = driver["check"].call_args_list[0].args[0]
+            self.assertEqual(call_params["images"], "image1 image2")
+            self.assertEqual(call_params["vms"], "vm1")
+            self.assertEqual(call_params["object_id"], "vm1-abc.def")
+            self.assertEqual(call_params["swarm_pool"], "/images")
         self.assertEqual(states, [])
 
-    @mock.patch('avocado_i2n.states.lvm.env_process', mock.Mock(return_value=0))
-    @mock.patch('avocado_i2n.states.lvm.process')
-    def test_initialize_image_lvm(self, mock_process):
+    def test_initialize_image_lvm(self):
         """Test that initialization with the LVM backend works."""
         backend = "lvm"
         backend_type = self._prepare_driver_from_backend(backend)
-        self.run_params["set_size_vm1"] = "30G"
-        self.run_params["lv_pool_name"] = "thin_pool"
-        self.run_params["lv_pool_size"] = "30G"
-        self.run_params["lv_size"] = "30G"
         self.run_params["image_name_vm1"] = "vm1/image"
         self.run_params["disk_sparse_filename_vm1"] = "virtual_hdd_vm1"
-        self.run_params["use_tmpfs"] = "yes"
         self.run_params["disk_basedir_vm1"] = "/tmp"
-        self.run_params["disk_vg_size_vm1"] = "40000"
-        self.run_params["image_raw_device_vm1"] = "no"
-        # TODO: LVM is still internally tied to QCOW images and needs testing otherwise
-        self.run_params["image_format"] = "qcow2"
+        self.run_params["lv_pool_name"] = "thin_pool"
+        self.run_params["lv_pool_size"] = "30G"
         self.run_params["show_mode"] = "xf"
 
-        def process_run_side_effect(cmd, **kwargs):
-            if cmd == "pvs":
-                stdout = b"/dev/loop0 disk_vm1   lvm2"
-            elif cmd == "losetup --find":
-                stdout = b"/dev/loop0"
-            elif cmd == "losetup --all":
-                stdout = b"/dev/loop0: [0050]:2033 (/tmp/vm1_image1/virtual_hdd)"
-            else:
-                stdout = b""
-            result = process.CmdResult(cmd, stdout=stdout, exit_status=0)
-            return result
-        mock_process.run.side_effect = process_run_side_effect
-        mock_process.system.return_value = 0
-
         # assert root state is not detected and created
-        mock_process.reset_mock()
         with self.driver.mock_show([], backend_type, False) as driver:
             ss.show_states(self.run_params, self.env)
-            driver.lv_check.assert_called_with('disk_vm1', 'LogVol')
-            driver.lv_create.assert_called_once_with('disk_vm1', 'LogVol', '30G', pool_name='thin_pool', pool_size='30G')
-            driver.lv_take_snapshot.assert_called_once_with('disk_vm1', 'LogVol', 'current_state')
-        mock_process.run.assert_called_with('vgcreate disk_vm1 /dev/loop0', sudo=True)
+            driver["check"].assert_called_once()
+            driver["initialize"].assert_called_once()
+            call_params = driver["initialize"].call_args_list[0].args[0]
+            self.assertEqual(call_params["vms"], "vm1")
+            self.assertEqual(call_params["image_name"], "vm1/image")
+            self.assertEqual(call_params["vg_name"], "disk_vm1")
+            self.assertEqual(call_params["lv_name"], "LogVol")
+            self.assertEqual(call_params["disk_sparse_filename_vm1"], "virtual_hdd_vm1")
+            self.assertEqual(call_params["disk_basedir_vm1"], "/tmp")
+            self.assertEqual(call_params["lv_pool_name"], "thin_pool")
+            self.assertEqual(call_params["lv_pool_size"], "30G")
 
-    @mock.patch('avocado_i2n.states.qcow2.env_process')
-    def test_initialize_image_qcow2(self, mock_env_process):
+    def test_initialize_image_qcow2(self):
         """Test that initialization with the QCOW2 backend works."""
         backend = "qcow2"
         backend_type = self._prepare_driver_from_backend(backend)
         self.run_params["show_mode"] = "xf"
 
         # assert root state is not detected and created
-        mock_env_process.reset_mock()
         with self.driver.mock_show([], backend_type, False) as driver:
             ss.show_states(self.run_params, self.env)
-            self.mock_vms["vm1"].is_alive.assert_called()
-            # called twice because QCOW2's initialize can only set missing root part
-            # like only turning off the vm or only creating an image
-            self.mock_file_exists.assert_called_with("/images/vm1/image.qcow2")
-        mock_env_process.preprocess_image.assert_called_once()
-
-        # assert running vms are shut down before setting state preconditions
-        mock_env_process.reset_mock()
-        with self.driver.mock_show([], backend_type, False) as driver:
-            self.mock_vms["vm1"].is_alive.return_value = True
-            ss.show_states(self.run_params, self.env)
-            # is vm is not alive root is not available and no need to check image existence
-            self.mock_vms["vm1"].is_alive.assert_called()
-            self.mock_vms["vm1"].destroy.assert_called_once_with(gracefully=True)
-        mock_env_process.preprocess_image.assert_called_once()
+            driver["check"].assert_called_once()
+            driver["initialize"].assert_called_once()
+            call_params = driver["initialize"].call_args_list[0].args[0]
+            self.assertEqual(call_params["images_base_dir"], "/images/vm1")
+            self.assertEqual(call_params["vms"], "vm1")
+            self.assertEqual(call_params["image_name"], "image")
+            self.assertEqual(call_params["image_format"], "qcow2")
 
     def test_initialize_image_qcow2ext(self):
         """Test that initialization with the qcow2ext state backend works."""
@@ -698,11 +693,15 @@ class StatesBoundaryTest(Test):
         backend_type = self._prepare_driver_from_backend(backend)
         self.run_params["show_mode"] = "xf"
 
-        # assert root state is detected and removed
+        # assert root state is not detected and created
         with self.driver.mock_show([], backend_type, False) as driver:
             ss.show_states(self.run_params, self.env)
-            print(driver.makedirs.call_args_list)
-            driver.makedirs.assert_called_once_with("/images/vm1-abc.def/image1", exist_ok=True)
+            driver["check"].assert_called_once()
+            driver["initialize"].assert_called_once()
+            call_params = driver["initialize"].call_args_list[0].args[0]
+            self.assertEqual(call_params["images"], "image1")
+            self.assertEqual(call_params["object_id"], "vm1-abc.def")
+            self.assertEqual(call_params["swarm_pool"], "/images")
 
     @mock.patch('avocado_i2n.states.qcow2.env_process')
     def test_initialize_vm(self, mock_env):
@@ -716,58 +715,53 @@ class StatesBoundaryTest(Test):
                 # assert root state is not detected and created
                 with self.driver.mock_show([], backend_type, False) as driver:
                     ss.show_states(self.run_params, self.env)
-                    mock_env.preprocess_image.assert_called_once()
+                    driver["check"].assert_called_once()
+                    driver["initialize"].assert_called_once()
+                    call_params = driver["initialize"].call_args_list[0].args[0]
+                    self.assertEqual(call_params["images"], "image1")
+                    self.assertEqual(call_params["vms"], "vm1")
                     if backend == "ramfile":
-                        driver.makedirs.assert_any_call("/images/vm1-abc.def", exist_ok=True)
+                        self.assertEqual(call_params["object_id"], "vm1-abc.def")
+                        self.assertEqual(call_params["swarm_pool"], "/images")
 
-    @mock.patch('avocado_i2n.states.lvm.vg_cleanup')
-    def test_finalize_image_lvm(self, mock_vg_cleanup):
+    def test_finalize_image_lvm(self):
         """Test that finalization with the LVM backend works."""
         backend = "lvm"
         backend_type = self._prepare_driver_from_backend(backend)
         self.run_params["image_name_vm1"] = "vm1/image"
         self.run_params["disk_sparse_filename_vm1"] = "virtual_hdd_vm1"
-        self.run_params["use_tmpfs"] = "yes"
         self.run_params["disk_basedir_vm1"] = "/tmp"
-        self.run_params["image_raw_device_vm1"] = "no"
         self.run_params["show_mode"] = "fx"
 
         # assert root state is detected and removed
-        mock_vg_cleanup.reset_mock()
         with self.driver.mock_show([], backend_type, True) as driver:
             ss.show_states(self.run_params, self.env)
-            driver.vg_check.assert_called_once_with('disk_vm1')
-        mock_vg_cleanup.assert_called_once_with('virtual_hdd_vm1', '/tmp/disk_vm1', 'disk_vm1', None, True)
+            driver["check"].assert_called_once()
+            driver["finalize"].assert_called_once()
+            call_params = driver["finalize"].call_args_list[0].args[0]
+            self.assertEqual(call_params["vms"], "vm1")
+            self.assertEqual(call_params["image_name"], "vm1/image")
+            self.assertEqual(call_params["vg_name"], "disk_vm1")
+            self.assertEqual(call_params["lv_name"], "LogVol")
+            self.assertEqual(call_params["disk_sparse_filename_vm1"], "virtual_hdd_vm1")
+            self.assertEqual(call_params["disk_basedir_vm1"], "/tmp")
 
-        # test tolerance to cleanup errors
-        mock_vg_cleanup.reset_mock()
-        mock_vg_cleanup.side_effect = exceptions.TestError("cleanup failed")
-        with self.driver.mock_show([], backend_type, True) as driver:
-            driver.vg_check.return_value = True
-            ss.show_states(self.run_params, self.env)
-            driver.vg_check.assert_called_once_with('disk_vm1')
-        mock_vg_cleanup.assert_called_once_with('virtual_hdd_vm1', '/tmp/disk_vm1', 'disk_vm1', None, True)
-
-    @mock.patch('avocado_i2n.states.qcow2.os')
-    @mock.patch('avocado_i2n.states.qcow2.env_process')
-    def test_finalize_image_qcow2(self, mock_env_process, mock_os):
+    def test_finalize_image_qcow2(self):
         """Test that finalization with the QCOW2 backend works."""
         backend = "qcow2"
         backend_type = self._prepare_driver_from_backend(backend)
         self.run_params["show_mode"] = "fx"
 
         # assert root state is detected and removed
-        mock_os.reset_mock()
-        mock_env_process.reset_mock()
         with self.driver.mock_show([], backend_type, True) as driver:
             ss.show_states(self.run_params, self.env)
-        mock_env_process.postprocess_image.assert_called_once()
-        mock_os.rmdir.assert_called_once()
-
-        # TODO: assert running vms result in not completely available root state
-        # TODO: running vm implies no root state which implies ignore or abort policy
-        #self.mock_vms["vm1"].destroy.assert_called_once_with(gracefully=False)
-        pass
+            driver["check"].assert_called_once()
+            driver["finalize"].assert_called_once()
+            call_params = driver["finalize"].call_args_list[0].args[0]
+            self.assertEqual(call_params["images_base_dir"], "/images/vm1")
+            self.assertEqual(call_params["vms"], "vm1")
+            self.assertEqual(call_params["image_name"], "image")
+            self.assertEqual(call_params["image_format"], "qcow2")
 
     def test_finalize_image_qcow2ext(self):
         """Test that finalization with the qcow2ext state backend works."""
@@ -778,7 +772,12 @@ class StatesBoundaryTest(Test):
         # assert root state is detected and removed
         with self.driver.mock_show([], backend_type, True) as driver:
             ss.show_states(self.run_params, self.env)
-            driver.rmdir.assert_called_once_with("/images/vm1-abc.def/image1")
+            driver["check"].assert_called_once()
+            driver["finalize"].assert_called_once()
+            call_params = driver["finalize"].call_args_list[0].args[0]
+            self.assertEqual(call_params["images"], "image1")
+            self.assertEqual(call_params["object_id"], "vm1-abc.def")
+            self.assertEqual(call_params["swarm_pool"], "/images")
 
     @mock.patch('avocado_i2n.states.qcow2.env_process')
     def test_finalize_vm(self, mock_env_process):
@@ -792,71 +791,14 @@ class StatesBoundaryTest(Test):
                 # assert root state is detected and removed
                 with self.driver.mock_show([], backend_type, True) as driver:
                     ss.show_states(self.run_params, self.env)
-                    mock_env_process.postprocess_image.assert_called_once()
+                    driver["check"].assert_called_once()
+                    driver["finalize"].assert_called_once()
+                    call_params = driver["finalize"].call_args_list[0].args[0]
+                    self.assertEqual(call_params["images"], "image1")
+                    self.assertEqual(call_params["vms"], "vm1")
                     if backend == "ramfile":
-                        driver.rmdir.assert_any_call("/images/vm1-abc.def")
-
-    def test_qcow2_dash(self):
-        """Test the special character support for the QCOW2 backends."""
-        self.run_params["image_name"] = "vm1/image"
-
-        for do in ["show", "get", "set", "unset"]:
-            for state_type in ["images", "vms"]:
-                with self.subTest(f"Testing QCOW2 dash processing for {do} operation on {state_type}"):
-                    backend = "qcow2" if state_type == "images" else "qcow2vt"
-                    backend_type = self._prepare_driver_from_backend(backend)
-                    self.run_params[f"{do}_state_{state_type}"] = "launch-ready_123"
-
-                    # check root state name format
-                    with self.driver.mock_show(["launch-ready_123"], backend_type) as driver:
-                        ss.__dict__[f"{do}_states"](self.run_params, self.env)
-                    del self.run_params[f"{do}_state_{state_type}"]
-
-                    # check internal state name format
-                    if do == "check":
-                        continue
-                    self.run_params[f"{do}_state"] = "launch-ready_123"
-                    run_params = self.run_params.object_params("vm1")
-                    with self.driver.mock_show(["launch-ready_123"], backend_type) as driver:
-                        ss.BACKENDS["qcow2"]().__getattribute__(do)(run_params, self.env)
-                        ss.BACKENDS["qcow2vt"]().__getattribute__(do)(run_params, self.env)
-                    del self.run_params[f"{do}_state"]
-
-    @mock.patch('avocado_i2n.states.qcow2.os.path.isfile')
-    def test_qcow2_convert(self, mock_isfile):
-        """Test auxiliary qcow2 module conversion functionality."""
-        self.run_params["raw_image"] = "ext_image"
-        # set a generic one not restricted to vm1
-        self.run_params["image_name"] = "vm1/image"
-        self.run_params = self.run_params.object_params("vm1")
-        backend = "qcow2"
-        backend_type = self._prepare_driver_from_backend(backend)
-
-        mock_isfile.return_value = True
-        with self.driver.mock_show([], backend_type, False) as driver:
-            qcow2.convert_image(self.run_params)
-            driver.return_value.convert.assert_called()
-            # TODO: this is now fully external assertion beyond our mocks
-            # 'qemu-img convert -c -p -O qcow2 "./ext_image" "/images/vm1/image.qcow2"'
-
-        mock_isfile.return_value = False
-        with self.driver.mock_show([], backend_type, False) as driver:
-            with self.assertRaises(FileNotFoundError):
-                qcow2.convert_image(self.run_params)
-            driver.return_value.assert_not_called()
-
-        mock_isfile.return_value = True
-        with self.driver.mock_show([], backend_type, False) as driver:
-            driver.CmdError = process.CmdError
-            result = process.CmdResult("qemu-img convert", stderr=b'..."write" lock...', exit_status=0)
-            driver.return_value.check.side_effect = process.CmdError(result=result)
-            with self.assertRaises(process.CmdError):
-                qcow2.convert_image(self.run_params)
-            # no convert command was executed
-            driver.return_value.check.assert_called_once()
-            # TODO: this is now fully external assertion beyond our mocks
-            # 'qemu-img check /images/vm1/image.qcow2'
-            driver.return_value.assert_not_called()
+                        self.assertEqual(call_params["object_id"], "vm1-abc.def")
+                        self.assertEqual(call_params["swarm_pool"], "/images")
 
 
 @mock.patch('avocado_i2n.states.pool.os.makedirs', mock.Mock(return_value=0))
@@ -1797,7 +1739,7 @@ class StatesSetupTest(Test):
                         return getattr(cls, name)
             m = mock.MagicMock(spec_set=cls)
             return meta(cls.__name__, cls.__bases__, {})
-        self.backend = mock_class(ss.StateBackend)
+        self.backend = mock_class(composition.StateBackend)
         ss.BACKENDS = {"mock": self.backend}
 
     def _set_up_generic_params(self, state_op, state_name, state_type, state_object):
@@ -2297,7 +2239,6 @@ class StatesSetupTest(Test):
         self.backend.reset_mock()
         self.backend.show.return_value = ["launch", "launch2", "launcher", "root"]
         exists = ss.show_states(self.run_params, self.env)
-        print(self.backend.show.call_args_list)
         call_params = [call.args[0] for call in self.backend.show.call_args_list]
         self.assertEqual(len(call_params), 5)
         self.assertEqual(call_params[0]["vms"], "vm1")
