@@ -80,13 +80,16 @@ class MockDriver(unittest.TestCase):
             mock_driver.path.join = os.path.join
             mock_driver.path.dirname = os.path.dirname
             mock_driver.path.exists = self.mock_file_exists
+            mock_driver.makedirs = mock.MagicMock()
+            mock_driver.rmdir = mock.MagicMock()
             self.exist_switch = root_exists
             class QemuImgMock():
                 def __init__(self, params, root_dir, tag):
                     self.image_filename = os.path.join(root_dir, tag)
             with mock.patch('avocado_i2n.states.qcow2.QemuImg', QemuImgMock):
-                with mock.patch('avocado_i2n.states.qcow2.os', mock_driver):
-                    yield mock_driver
+                with mock.patch('avocado_i2n.states.qcow2.env_process', mock.MagicMock()):
+                    with mock.patch('avocado_i2n.states.qcow2.os', mock_driver):
+                        yield mock_driver
         elif backend == "ramfile":
             ramfile.RamfileBackend.image_state_backend.show.return_value = state_names
             mock_driver.listdir.return_value = [s + ".state" for s in state_names]
@@ -689,6 +692,18 @@ class StatesBoundaryTest(Test):
             self.mock_vms["vm1"].destroy.assert_called_once_with(gracefully=True)
         mock_env_process.preprocess_image.assert_called_once()
 
+    def test_initialize_image_qcow2ext(self):
+        """Test that initialization with the qcow2ext state backend works."""
+        backend = "qcow2ext"
+        backend_type = self._prepare_driver_from_backend(backend)
+        self.run_params["show_mode"] = "xf"
+
+        # assert root state is detected and removed
+        with self.driver.mock_show([], backend_type, False) as driver:
+            ss.show_states(self.run_params, self.env)
+            print(driver.makedirs.call_args_list)
+            driver.makedirs.assert_called_once_with("/images/vm1-abc.def/image1", exist_ok=True)
+
     @mock.patch('avocado_i2n.states.qcow2.env_process')
     def test_initialize_vm(self, mock_env):
         """Test that initialization with a vm state backend works."""
@@ -701,11 +716,9 @@ class StatesBoundaryTest(Test):
                 # assert root state is not detected and created
                 with self.driver.mock_show([], backend_type, False) as driver:
                     ss.show_states(self.run_params, self.env)
-                    if backend == "qcow2vt":
-                        mock_env.preprocess_image.assert_called_once()
-                    elif backend == "ramfile":
+                    mock_env.preprocess_image.assert_called_once()
+                    if backend == "ramfile":
                         driver.makedirs.assert_any_call("/images/vm1-abc.def", exist_ok=True)
-                        mock_env.preprocess_image.assert_called_once()
 
     @mock.patch('avocado_i2n.states.lvm.vg_cleanup')
     def test_finalize_image_lvm(self, mock_vg_cleanup):
@@ -756,6 +769,17 @@ class StatesBoundaryTest(Test):
         #self.mock_vms["vm1"].destroy.assert_called_once_with(gracefully=False)
         pass
 
+    def test_finalize_image_qcow2ext(self):
+        """Test that finalization with the qcow2ext state backend works."""
+        backend = "qcow2ext"
+        backend_type = self._prepare_driver_from_backend(backend)
+        self.run_params["show_mode"] = "fx"
+
+        # assert root state is detected and removed
+        with self.driver.mock_show([], backend_type, True) as driver:
+            ss.show_states(self.run_params, self.env)
+            driver.rmdir.assert_called_once_with("/images/vm1-abc.def/image1")
+
     @mock.patch('avocado_i2n.states.qcow2.env_process')
     def test_finalize_vm(self, mock_env_process):
         """Test that finalization with a vm state backend works."""
@@ -769,6 +793,8 @@ class StatesBoundaryTest(Test):
                 with self.driver.mock_show([], backend_type, True) as driver:
                     ss.show_states(self.run_params, self.env)
                     mock_env_process.postprocess_image.assert_called_once()
+                    if backend == "ramfile":
+                        driver.rmdir.assert_any_call("/images/vm1-abc.def")
 
     def test_qcow2_dash(self):
         """Test the special character support for the QCOW2 backends."""
