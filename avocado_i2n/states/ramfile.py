@@ -203,8 +203,10 @@ class RamfileBackend(SourcedStateBackend):
         All arguments match the base class.
         """
         vm_name = params["vms"]
+
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, params["object_id"])
+        logging.info("Creating base directory as a shared initialization precondition")
         os.makedirs(vm_dir, exist_ok=True)
 
         for image_name in params.objects("images"):
@@ -222,9 +224,15 @@ class RamfileBackend(SourcedStateBackend):
         All arguments match the base class.
         """
         vm_name = params["vms"]
+
         for image_name in params.objects("images"):
             logging.info(
-                f"Remove image {image_name} in order to remove all vm states of {vm_name}",
+                f"Removing image {image_name} in order to remove all vm states of {vm_name}",
             )
             image_params = params.object_params(image_name)
             RamfileBackend.image_state_backend.finalize(image_params)
+
+        state_dir = params["swarm_pool"]
+        vm_dir = os.path.join(state_dir, params["object_id"])
+        logging.info("Removing base directory as a shared finalization postcondition")
+        os.rmdir(vm_dir)
