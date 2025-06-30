@@ -29,7 +29,7 @@ from typing import Any
 
 from virttest.utils_params import Params
 
-from .setup import StateBackend
+from .composition import StateBackend
 
 
 class BtrfsBackend(StateBackend):
