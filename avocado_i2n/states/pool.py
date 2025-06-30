@@ -14,7 +14,7 @@
 # along with avocado-i2n.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Module for the QCOW2 pool state management backend.
+Module for the pool state management backends.
 
 SUMMARY
 ------------------------------------------------------
@@ -44,7 +44,7 @@ from virttest.utils_params import Params
 
 from virttest.qemu_storage import QemuImg
 
-from .setup import StateBackend
+from .composition import StateBackend
 
 
 logging = log.getLogger("avocado.job." + __name__)

@@ -38,6 +38,7 @@ from virttest import env_process
 from virttest.qemu_storage import QemuImg
 from virttest.utils_params import Params
 
+from .composition import ImageStateBackend, VMStateBackend
 from .pool import RootSourcedStateBackend, SourcedStateBackend
 
 
@@ -55,61 +56,8 @@ QEMU_ON_STATES_REGEX = re.compile(
 )
 
 
-class QCOW2Backend(RootSourcedStateBackend):
+class QCOW2Backend(ImageStateBackend, RootSourcedStateBackend):
     """Backend manipulating image states as internal QCOW2 snapshots."""
-
-    _require_running_object = False
-
-    @classmethod
-    def state_type(cls) -> str:
-        """State type string representation depending used for logging."""
-        return "on/vm" if cls._require_running_object else "off/image"
-
-    @classmethod
-    def switch_off(cls, mode: str, object: Any = None) -> None:
-        """
-        Switch vm or other object off if a non-running object is required.
-
-        :param mode: how to switch off - "soft", "hard", or "none"
-        :param object: the object to switch off
-        """
-        if mode not in ["soft", "hard", "none"]:
-            raise ValueError(
-                f"Invalid switch mode {mode} - must be soft, hard, or none"
-            )
-
-        vm = object
-        if vm is None or not vm.is_alive():
-            logging.warning("Will not switch off vm that is not available or alive")
-            return
-        if mode == "none":
-            raise RuntimeError("The vm is alive and it shouldn't be")
-
-        logging.info("The vm %s is running, switching it off", vm.name)
-        vm.destroy(gracefully=mode == "soft")
-
-    @classmethod
-    def switch_on(cls, mode: str, object: Any = None) -> None:
-        """
-        Switch vm or other object on if a non-running object is required.
-
-        :param mode: how to switch off - "soft", "hard", or "none"
-        :param object: the object to switch on
-        """
-        if mode not in ["soft", "hard", "none"]:
-            raise ValueError(
-                f"Invalid switch mode {mode} - must be soft, hard, or none"
-            )
-
-        vm = object
-        if mode == "none":
-            return
-        if vm is None or vm.is_alive():
-            logging.warning("Will not switch on vm that is not available or alive")
-            return
-
-        logging.info("Starting the vm %s after image state operation", vm.name)
-        vm.create()
 
     @classmethod
     def show(cls, params: Params, object: Any = None) -> list[str]:
@@ -118,24 +66,30 @@ class QCOW2Backend(RootSourcedStateBackend):
 
         All arguments match the base class.
         """
+        return cls._show_driver(params, object)
+
+    @classmethod
+    def _show_driver(cls, params: Params, object: Any = None) -> list[str]:
+        """
+        Return a list of available states of a specific type.
+
+        All arguments match the base class.
+        """
         qemu_img = QemuImg(params, params["images_base_dir"], params["images"])
         logging.debug(
-            "Showing %s internal states for image %s",
-            cls.state_type(),
+            "Showing image internal states for image %s",
             params["images"],
         )
         on_snapshots_dump = qemu_img.snapshot_list(force_share=True)
+        require_running_object = params.get_boolean("require_ram", False)
         pattern = (
-            QEMU_ON_STATES_REGEX
-            if cls._require_running_object
-            else QEMU_OFF_STATES_REGEX
+            QEMU_ON_STATES_REGEX if require_running_object else QEMU_OFF_STATES_REGEX
         )
         state_tuples = re.findall(pattern, on_snapshots_dump)
         states = []
         for state_tuple in state_tuples:
             logging.debug(
-                "Detected %s state '%s' of size %s",
-                cls.state_type(),
+                "Detected image state '%s' of size %s",
                 state_tuple[0],
                 state_tuple[1],
             )
@@ -143,76 +97,46 @@ class QCOW2Backend(RootSourcedStateBackend):
         return states
 
     @classmethod
-    def get(cls, params: Params, object: Any = None) -> None:
+    def _get_driver(cls, params: Params, object: Any = None) -> None:
         """
         Retrieve a state disregarding the current changes.
 
         All arguments match the base class.
         """
-        vm, vm_name = object, params["vms"]
-        state, switch = params["get_state"], params["get_switch"]
         image = params["images"]
-        logging.info(
-            "Reusing %s state '%s' of %s/%s", cls.state_type(), state, vm_name, image
-        )
-
-        cls.switch_off(switch, vm)
-
         params["image_chain"] = f"{image} snapshot"
         params["image_raw_device_snapshot"] = "yes"
-        params["image_name_snapshot"] = state
+        params["image_name_snapshot"] = params["get_state"]
         qemu_img = QemuImg(params, params["images_base_dir"], image)
         qemu_img.snapshot_apply()
 
-        cls.switch_on(switch, vm)
-
     @classmethod
-    def set(cls, params: Params, object: Any = None) -> None:
+    def _set_driver(cls, params: Params, object: Any = None) -> None:
         """
         Store a state saving the current changes.
 
         All arguments match the base class.
         """
-        vm, vm_name = object, params["vms"]
-        state, switch = params["set_state"], params["set_switch"]
         image = params["images"]
-        logging.info(
-            "Creating %s state '%s' of %s/%s", cls.state_type(), state, vm_name, image
-        )
-
-        cls.switch_off(switch, vm)
-
         params["image_chain"] = f"{image} snapshot"
         params["image_raw_device_snapshot"] = "yes"
-        params["image_name_snapshot"] = state
+        params["image_name_snapshot"] = params["set_state"]
         qemu_img = QemuImg(params, params["images_base_dir"], image)
         qemu_img.snapshot_create()
 
-        cls.switch_on(switch, vm)
-
     @classmethod
-    def unset(cls, params: Params, object: Any = None) -> None:
+    def _unset_driver(cls, params: Params, object: Any = None) -> None:
         """
         Remove a state with previous changes.
 
         All arguments match the base class.
         """
-        vm, vm_name = object, params["vms"]
-        state, switch = params["unset_state"], params["unset_switch"]
         image = params["images"]
-        logging.info(
-            "Removing %s state '%s' of %s/%s", cls.state_type(), state, vm_name, image
-        )
-
-        cls.switch_off(switch, vm)
-
         params["image_chain"] = f"{image} snapshot"
         params["image_raw_device_snapshot"] = "yes"
-        params["image_name_snapshot"] = state
+        params["image_name_snapshot"] = params["unset_state"]
         qemu_img = QemuImg(params, params["images_base_dir"], image)
         qemu_img.snapshot_del()
-
-        cls.switch_on(switch, vm)
 
     @classmethod
     def _check(cls, params: Params, object: Any = None) -> bool:
@@ -299,6 +223,15 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
 
         All arguments match the base class.
         """
+        return cls._show_driver(params, object)
+
+    @classmethod
+    def _show_driver(cls, params: Params, object: Any = None) -> list[str]:
+        """
+        Return a list of available states of a specific type.
+
+        All arguments match the base class.
+        """
         vm_name, image_name = params["vms"], params["images"]
         vm_id = params["object_id"]
         state_dir = params["swarm_pool"]
@@ -321,7 +254,7 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
             size = os.stat(os.path.join(image_dir, snapshot)).st_size
             state = snapshot[:-6]
             logging.debug(
-                f"Detected {cls.state_type()} state '{state}' of size "
+                f"Detected image state '{state}' of size "
                 f"{round(size / 1024**3, 3)} GB ({size})"
             )
             states.append(state)
@@ -334,18 +267,19 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
 
         All arguments match the base class.
         """
-        vm_name, image_name = params["vms"], params["images"]
-        vm, vm_id = object, params["object_id"]
-        state, switch = params["get_state"], params["get_switch"]
-        logging.info(
-            "Reusing %s state '%s' of %s/%s",
-            cls.state_type(),
-            state,
-            vm_name,
-            image_name,
-        )
+        super(QCOW2Backend, cls).get(params, object)
 
-        cls.switch_off(switch, vm)
+    @classmethod
+    def _get_driver(cls, params: Params, object: Any = None) -> None:
+        """
+        Retrieve a state disregarding the current changes.
+
+        All arguments match the base class.
+        """
+        vm_name, image_name = params["vms"], params["images"]
+        vm_id = params["object_id"]
+        state = params["get_state"]
+
         logging.debug("Cleaning previous pointer and auxiliary data")
         QCOW2Backend._finalize(params, object)
         auxiliary_files = os.path.join(
@@ -366,8 +300,6 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
         )
         qemu_img.create(params, ignore_errors=False)
 
-        cls.switch_on(switch, vm)
-
     @classmethod
     def _set(cls, params: Params, object: Any = None) -> None:
         """
@@ -375,18 +307,19 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
 
         All arguments match the base class.
         """
-        vm_name, image_name = params["vms"], params["images"]
-        vm, vm_id = object, params["object_id"]
-        state, switch = params["set_state"], params["set_switch"]
-        logging.info(
-            "Creating %s state '%s' of %s/%s",
-            cls.state_type(),
-            state,
-            vm_name,
-            image_name,
-        )
+        super(QCOW2Backend, cls).set(params, object)
 
-        cls.switch_off(switch, vm)
+    @classmethod
+    def _set_driver(cls, params: Params, object: Any = None) -> None:
+        """
+        Store a state saving the current changes.
+
+        All arguments match the base class.
+        """
+        vm_name, image_name = params["vms"], params["images"]
+        vm_id = params["object_id"]
+        state = params["set_state"]
+
         if not QCOW2Backend._check(params, object):
             raise RuntimeError(f"Missing head pointer image to commit as {state}")
 
@@ -394,9 +327,6 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
         vm_dir = os.path.join(state_dir, vm_id)
         image_dir = os.path.join(vm_dir, image_name)
         state_file = os.path.join(image_dir, state + ".qcow2")
-        # TODO: this does not follow a simple imperative boundary and has to be refactored
-        # together with a more natural support for qcow2ext and general external state chains,
-        # i.e. no conditionals allowed at the boundary
         qemu_img = QemuImg(
             params, os.path.join(params["vms_base_dir"], vm_name), image_name
         )
@@ -429,8 +359,6 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
         else:
             shutil.copy(qemu_img.image_filename, state_file)
 
-        cls.switch_on(switch, vm)
-
     @classmethod
     def _unset(cls, params: Params, object: Any = None) -> None:
         """
@@ -438,18 +366,19 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
 
         All arguments match the base class.
         """
-        vm_name, image_name = params["vms"], params["images"]
-        vm, vm_id = object, params["object_id"]
-        state, switch = params["unset_state"], params["unset_switch"]
-        logging.info(
-            "Removing %s state '%s' of %s/%s",
-            cls.state_type(),
-            state,
-            vm_name,
-            image_name,
-        )
+        super(QCOW2Backend, cls).unset(params, object)
 
-        cls.switch_off(switch, vm)
+    @classmethod
+    def _unset_driver(cls, params: Params, object: Any = None) -> None:
+        """
+        Remove a state with previous changes.
+
+        All arguments match the base class.
+        """
+        vm_name, image_name = params["vms"], params["images"]
+        vm_id = params["object_id"]
+        state = params["unset_state"]
+
         logging.debug("Cleaning previous pointer and auxiliary data")
         QCOW2Backend._finalize(params, object)
         auxiliary_files = os.path.join(
@@ -473,8 +402,6 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
         # qemu_img = QemuImg(params, os.path.join(params["vms_base_dir"], vm_name), image_name)
         # TODO: should we move to pointer image in case removed state is in backing chain?
         os.unlink(os.path.join(image_dir, state + ".qcow2"))
-
-        cls.switch_on(switch, vm)
 
     @classmethod
     def check(cls, params: Params, object: Any = None) -> bool:
@@ -503,7 +430,7 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, vm_id)
         image_dir = os.path.join(vm_dir, image_name)
-        logging.info("Creating base directory as a shared initialization precondition")
+        logging.info("Creating base directory for image %s", image_name)
         os.makedirs(image_dir, exist_ok=True)
 
     @classmethod
@@ -517,36 +444,43 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, vm_id)
         image_dir = os.path.join(vm_dir, image_name)
-        logging.info("Removing base directory as a shared finalization postcondition")
+        logging.info("Removing base directory for image %s", image_name)
         os.rmdir(image_dir)
 
 
-class QCOW2VTBackend(QCOW2Backend):
+class QCOW2VTBackend(QCOW2Backend, VMStateBackend):
     """Backend manipulating vm states as QCOW2 snapshots using VT's VM bindings."""
 
-    _require_running_object = True
-
     @classmethod
-    def show(cls, params: Params, object: Any = None) -> set[str]:
+    def show(cls, params: Params, object: Any = None) -> list[str]:
         """
         Return a list of available states of a specific type.
 
         All arguments match the base class.
         """
-        logging.debug(
-            f"Showing {cls.state_type()} internal states for vm {params['vms']}"
-        )
-        states = set()
-        for image_name in params.objects("images"):
+        return cls._show_driver(params, object)
+
+    @classmethod
+    def _show_driver(cls, params: Params, object: Any = None) -> list[str]:
+        """
+        Return a list of available states of a specific type.
+
+        All arguments match the base class.
+        """
+        logging.debug(f"Showing vm states for vm {params['vms']}")
+        states = None
+        for i, image_name in enumerate(params.objects("images")):
             image_params = params.object_params(image_name)
             # TODO: refine method arguments by providing at least the image name directly
             image_params["images"] = image_name
-            image_states = super().show(image_params, object=object)
-            if len(states) == 0:
-                states = image_states
+            # the first image also contains the stored RAM for a vm state
+            image_params["require_ram"] = "yes" if i == 0 else "no"
+            image_states = super(QCOW2Backend, cls).show(image_params, object=object)
+            if states is None:
+                states = set(image_states)
             else:
-                states = states.intersect(image_states)
-        return states
+                states = states.intersection(image_states)
+        return list(states)
 
     @classmethod
     def get(cls, params: Params, object: Any = None) -> None:
@@ -563,6 +497,16 @@ class QCOW2VTBackend(QCOW2Backend):
         if not vm.is_alive():
             vm.create()
 
+        cls._get_driver(params, object)
+
+    @classmethod
+    def _get_driver(cls, params: Params, object: Any = None) -> None:
+        """
+        Retrieve a state disregarding the current changes.
+
+        All arguments match the base class.
+        """
+        vm = object
         vm.pause()
         vm.loadvm(params["get_state"])
         vm.resume(timeout=3)
@@ -580,9 +524,31 @@ class QCOW2VTBackend(QCOW2Backend):
         if vm is None or not vm.is_alive():
             raise RuntimeError("No booted vm and thus vm state to set")
 
+        cls._set_driver(params, object)
+
+    @classmethod
+    def _set_driver(cls, params: Params, object: Any = None) -> None:
+        """
+        Store a state saving the current changes.
+
+        All arguments match the base class.
+        """
+        vm = object
         vm.pause()
         vm.savevm(params["set_state"])
         vm.resume(timeout=3)
+
+    @classmethod
+    def _unset_driver(cls, params: Params, object: Any = None) -> None:
+        """
+        Store a state saving the current changes.
+
+        All arguments match the base class.
+
+        Since all qcow2 images are removed there is nothing else to do and
+        we can simply reuse the public vm state backend unset method.
+        """
+        pass
 
     @classmethod
     def _check(cls, params: Params, object: Any = None) -> bool:
@@ -591,23 +557,7 @@ class QCOW2VTBackend(QCOW2Backend):
 
         All arguments match the base class.
         """
-        vm_name = params["vms"]
-        logging.debug("Checking whether %s's root state is fully available", vm_name)
-        for image_name in params.objects("images"):
-            image_params = params.object_params(image_name)
-            image_path = image_params["image_name"]
-            if not os.path.isabs(image_path):
-                image_path = os.path.join(image_params["images_base_dir"], image_path)
-            image_format = image_params.get("image_format", "qcow2")
-            image_format = "" if image_format in ["raw", ""] else "." + image_format
-            if not os.path.exists(image_path + image_format):
-                logging.info(
-                    "The required virtual machine %s has a missing image %s",
-                    vm_name,
-                    image_path + image_format,
-                )
-                return False
-        return True
+        return super(RootSourcedStateBackend, cls).check(params, object=object)
 
     @classmethod
     def _initialize(cls, params: Params, object: Any = None) -> None:
@@ -619,25 +569,7 @@ class QCOW2VTBackend(QCOW2Backend):
         ..todo:: Study better the environment pre/postprocessing details necessary
                  for flawless vm destruction and creation to improve these.
         """
-        vm_name = params["vms"]
-        for image_name in params.objects("images"):
-            image_params = params.object_params(image_name)
-            image_path = image_params["image_name"]
-            if not os.path.isabs(image_path):
-                image_path = os.path.join(image_params["images_base_dir"], image_path)
-            image_format = image_params.get("image_format")
-            image_format = "" if image_format in ["raw", ""] else "." + image_format
-            if not os.path.exists(image_path + image_format):
-                logging.info(
-                    "Creating image %s in order to boot %s",
-                    image_path + image_format,
-                    vm_name,
-                )
-                os.makedirs(os.path.dirname(image_path), exist_ok=True)
-                image_params.update(
-                    {"create_image": "yes", "force_create_image": "yes"}
-                )
-                env_process.preprocess_image(None, image_params, image_path)
+        super(RootSourcedStateBackend, cls).initialize(params, object=object)
 
     @classmethod
     def _finalize(cls, params: Params, object: Any = None) -> None:
@@ -646,23 +578,7 @@ class QCOW2VTBackend(QCOW2Backend):
 
         All arguments match the base class.
         """
-        vm_name = params["vms"]
-        for image_name in params.objects("images"):
-            image_params = params.object_params(image_name)
-            image_path = image_params["image_name"]
-            if not os.path.isabs(image_path):
-                image_path = os.path.join(image_params["images_base_dir"], image_path)
-            image_format = image_params.get("image_format")
-            image_format = "" if image_format in ["raw", ""] else "." + image_format
-            if os.path.exists(image_path + image_format):
-                logging.info(
-                    "Removing image %s in order to remove all vm states of %s",
-                    image_path + image_format,
-                    vm_name,
-                )
-                os.makedirs(os.path.dirname(image_path), exist_ok=True)
-                image_params.update({"remove_image": "yes"})
-                env_process.postprocess_image(None, image_params, image_path)
+        super(RootSourcedStateBackend, cls).finalize(params, object=object)
 
 
 def get_image_path(params: Params) -> str:

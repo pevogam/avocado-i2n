@@ -209,6 +209,7 @@ def params_from_cmd(config: Params) -> None:
         "vmnet": vmnet.VMNetBackend,
     }
     ramfile.RamfileBackend.image_state_backend = qcow2.QCOW2ExtBackend
+    qcow2.QCOW2VTBackend.image_state_backend = qcow2.QCOW2Backend
 
 
 def full_vm_params_and_strs(
