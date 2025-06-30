@@ -30,23 +30,14 @@ from typing import Any
 
 from virttest.utils_params import Params
 
-from .setup import StateBackend
+from .composition import NetStateBackend
 from ..vmnet import VMNetwork
 
 
-class VMNetBackend(StateBackend):
+class VMNetBackend(NetStateBackend):
     """Backend manipulating network states as VMNet operations."""
 
     network_class = VMNetwork
-
-    @classmethod
-    def show(cls, params: Params, object: Any = None) -> list[str]:
-        """
-        Return a list of available states of a specific type.
-
-        All arguments match the base class.
-        """
-        return ["default"]
 
     @classmethod
     def get(cls, params: Params, object: Any = None) -> None:
@@ -63,48 +54,3 @@ class VMNetBackend(StateBackend):
         vmn.setup_host_services()
         env.vmnet = vmn
         type(env).get_vmnet = lambda self: self.vmnet
-
-    @classmethod
-    def set(cls, params: Params, object: Any = None) -> None:
-        """
-        Store a state saving the current changes.
-
-        All arguments match the base class.
-        """
-        pass
-
-    @classmethod
-    def unset(cls, params: Params, object: Any = None) -> None:
-        """
-        Remove a state with previous changes.
-
-        All arguments match the base class.
-        """
-        pass
-
-    @classmethod
-    def check(cls, params: Params, object: Any = None) -> bool:
-        """
-        Check whether a root state or essentially the object exists.
-
-        All arguments match the base class.
-        """
-        return True
-
-    @classmethod
-    def initialize(cls, params: Params, object: Any = None) -> None:
-        """
-        Set a root state to provide object existence.
-
-        All arguments match the base class.
-        """
-        pass
-
-    @classmethod
-    def finalize(cls, params: Params, object: Any = None) -> None:
-        """
-        Unset a root state to prevent object existence.
-
-        All arguments match the base class and in addition:
-        """
-        pass
