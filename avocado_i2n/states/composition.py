@@ -164,7 +164,7 @@ class ImageStateBackend(StateBackend):
         :param mode: how to switch off - "soft", "hard", or "none"
         :param object: the object to switch off
         """
-        if mode not in ["soft", "hard", "none"]:
+        if mode not in ["soft", "hard", "none", "off"]:
             raise ValueError(
                 f"Invalid switch mode {mode} - must be soft, hard, or none"
             )
@@ -187,7 +187,7 @@ class ImageStateBackend(StateBackend):
         :param mode: how to switch off - "soft", "hard", or "none"
         :param object: the object to switch on
         """
-        if mode not in ["soft", "hard", "none"]:
+        if mode not in ["soft", "hard", "none", "off"]:
             raise ValueError(
                 f"Invalid switch mode {mode} - must be soft, hard, or none"
             )
@@ -197,6 +197,9 @@ class ImageStateBackend(StateBackend):
             return
         if vm is None or vm.is_alive():
             logging.warning("Will not switch on vm that is not available or alive")
+            return
+        if mode == "off":
+            logging.info("Only off switch allowed for %s, not switching on", vm.name)
             return
 
         logging.info("Starting the vm %s after image state operation", vm.name)
