@@ -672,7 +672,7 @@ class QCOW2ImageTransfer(StateBackend):
         )
 
         states = cls.ops.list_paths(path, params)
-        states = [p.replace(format, "") for p in states]
+        states = [p.replace(format, "") for p in states if p.endswith(format)]
         return states
 
     @classmethod
