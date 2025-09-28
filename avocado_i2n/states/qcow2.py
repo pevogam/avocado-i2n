@@ -218,6 +218,9 @@ class QCOW2Backend(ImageStateBackend, RootSourcedStateBackend):
 class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
     """Backend manipulating image states as external QCOW2 snapshots."""
 
+    # TODO: add support for squashing down external state to a given choice of state
+    # (previous sysupdate and other scenario limitations)
+
     @classmethod
     def _show(cls, params: Params, object: Any = None) -> list[str]:
         """
