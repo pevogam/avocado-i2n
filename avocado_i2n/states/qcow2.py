@@ -611,6 +611,7 @@ def get_image_path(params: Params) -> str:
     return image_path
 
 
+# TODO: the qcow2 conversion no longer works (again!)
 def convert_image(params: Params) -> None:
     """
     Convert a raw img to a QCOW2 or other image usable for virtual machines.
