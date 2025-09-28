@@ -178,6 +178,14 @@ interruptions. QCOW2VT might not support some cases of states like ones using
 pflash drives while the Ramfile backend is generally unstable. In the end all
 state backends have different limitations with the major ones outlined so far.
 
+Each backend need the its own root conditions for all of get/set/unset operations:
+
+- ramfile = qcow2 dir + included image root conditions
+- qcow2ext = qcow2 dir + qcow2 overlay branch (in the future) that is in fact all root states for a given state of choice (needed for get/set but maybe not for unset)
+- qcow2vt = qcow2 file
+- qcow2 = qcow2 file
+- LVM = LogVol (and implicitly VG) + qcow2 set (to be compatible with at least one vm state backend)
+
 A final additional concept to consider for test running is that of permanent
 vms. For a test requiring vms with highly sophisticated preparation sequences
 that sometimes might be only semi-automatable or requiring strictly human input
