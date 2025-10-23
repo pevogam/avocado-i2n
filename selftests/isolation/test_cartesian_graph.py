@@ -2153,9 +2153,9 @@ class CartesianGraphTest(Test):
 
     def _run_traversal(self, graph, params=None):
         params = params or {"test_timeout": 100}
-        loop = asyncio.get_event_loop()
         slot_workers = sorted(list(graph.workers.values()), key=lambda x: x.params["name"])
         graph.runner = self.runner
+        loop = self.runner.loop
         to_traverse = [graph.traverse_object_trees(s, params) for s in slot_workers]
         loop.run_until_complete(asyncio.wait_for(asyncio.gather(*to_traverse), None))
         self.assertEqual(len(DummyTestRun.asserted_tests), 0, "Some tests weren't run: %s" % DummyTestRun.asserted_tests)
@@ -3232,6 +3232,7 @@ class CartesianGraphTest(Test):
         ]
         test_node.started_worker = "some-worker-since-only-traversal-allowed"
         to_run = self.runner.run_test_node(test_node)
+        # TODO: migrate to persistent loops (also below)
         status = asyncio.get_event_loop().run_until_complete(asyncio.wait_for(to_run, None))
         self.assertTrue(status)
         # the test succeed but too long so its status must be changed to WARN

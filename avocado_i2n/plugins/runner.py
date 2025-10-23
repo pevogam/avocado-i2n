@@ -71,6 +71,9 @@ class TestRunner(RunnerInterface):
         self.status_server = None
         self.previous_results = []
 
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+
     """results functionality"""
 
     async def _update_status(self) -> None:
@@ -368,10 +371,24 @@ class TestRunner(RunnerInterface):
                 raise RuntimeError(f"Failed to start environment {worker.id}")
         slot_workers = sorted([*graph.workers.values()], key=lambda x: x.params["name"])
         to_traverse = [graph.traverse_object_trees(s, params) for s in slot_workers]
+        asyncio.set_event_loop(self.loop)
         try:
-            asyncio.run(self.run_test_nodes(to_traverse, self.job.timeout or 86400))
+            self.loop.run_until_complete(
+                asyncio.wait_for(
+                    asyncio.shield(asyncio.gather(*to_traverse)),
+                    self.job.timeout or 86400,
+                )
+            )
         except asyncio.TimeoutError as error:
-            logging.error("Error during running workers: {error}")
+            logging.error(error)
+            import stackscope
+
+            logging.critical(
+                "Timeout exceeded. Printing stacks of all running coroutines:"
+            )
+            for task in asyncio.all_tasks(self.loop):
+                coro = task.get_coro()
+                logging.critical(stackscope.extract(coro))
         except KeyboardInterrupt as error:
             logging.info(str(error))
             self.job.interrupted_reason = str(error)
@@ -401,11 +418,11 @@ class TestRunner(RunnerInterface):
         self.status_server = StatusServer(
             self.job.config.get("run.status_server_listen"), self.status_repo
         )
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.status_server.create_server())
-        asyncio.ensure_future(self.status_server.serve_forever())
+
+        self.loop.run_until_complete(self.status_server.create_server())
+        self.loop.create_task(self.status_server.serve_forever())
         # TODO: this needs more customization
-        asyncio.ensure_future(self._update_status())
+        self.loop.create_task(self._update_status())
 
         params = self.job.config["param_dict"]
         try:
