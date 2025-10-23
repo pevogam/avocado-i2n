@@ -31,7 +31,7 @@ from __future__ import annotations
 import os
 import time
 import json
-from typing import Any
+from typing import Any, Coroutine
 import logging as log
 
 import asyncio
@@ -302,6 +302,32 @@ class TestRunner(RunnerInterface):
         else:
             return True
 
+    async def run_test_nodes(
+        self, to_traverse: list[Coroutine[Any, Any, None]], timeout: int
+    ) -> None:
+        """
+        Provide a single asyncio entry point to create and close an asyncio loop.
+
+        :param to_traverse: the coroutines to gather
+        :param timeout: timeout for the gathering process
+        """
+        try:
+            return await asyncio.wait_for(
+                asyncio.shield(asyncio.gather(*to_traverse)),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError as error:
+            logging.error(error)
+            import stackscope
+
+            logging.critical(
+                "Timeout exceeded. Printing stacks of all running coroutines:"
+            )
+            for task in asyncio.all_tasks():
+                coro = task.get_coro()
+                logging.critical(stackscope.extract(coro))
+            raise  # Re-raise to be caught by outer handler
+
     def run_workers(self, test_suite: TestSuite | TestGraph, params: Params) -> None:
         """
         Run all workers in parallel traversing the graph for each.
@@ -343,24 +369,9 @@ class TestRunner(RunnerInterface):
         slot_workers = sorted([*graph.workers.values()], key=lambda x: x.params["name"])
         to_traverse = [graph.traverse_object_trees(s, params) for s in slot_workers]
         try:
-            asyncio.get_event_loop().run_until_complete(
-                asyncio.wait_for(
-                    asyncio.shield(asyncio.gather(*to_traverse)),
-                    86400 or self.job.timeout or None,
-                )
-            )
+            asyncio.run(self.run_test_nodes(to_traverse, self.job.timeout or 86400))
         except asyncio.TimeoutError as error:
-            logging.error(error)
-            import stackscope
-
-            logging.critical(
-                "Timeout exceeded. Printing stacks of all running coroutines:"
-            )
-            all_coros = [
-                t.get_coro() for t in asyncio.all_tasks(asyncio.get_event_loop())
-            ]
-            for coro in all_coros:
-                logging.critical(stackscope.extract(coro))
+            logging.error("Error during running workers: {error}")
         except KeyboardInterrupt as error:
             logging.info(str(error))
             self.job.interrupted_reason = str(error)
