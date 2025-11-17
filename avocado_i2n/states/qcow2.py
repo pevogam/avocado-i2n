@@ -403,8 +403,7 @@ class QCOW2ExtBackend(SourcedStateBackend, QCOW2Backend):
         state_dir = params["swarm_pool"]
         vm_dir = os.path.join(state_dir, vm_id)
         image_dir = os.path.join(vm_dir, image_name)
-        # TODO: the qemu img could become useful if we implement the below todo
-        # qemu_img = QemuImg(params, os.path.join(params["vms_base_dir"], vm_name), image_name)
+        # NOTE: no qemu img command is useful for this state operation (based purely on files)
         # TODO: should we move to pointer image in case removed state is in backing chain?
         os.unlink(os.path.join(image_dir, state + ".qcow2"))
 
