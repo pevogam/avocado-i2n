@@ -2133,6 +2133,10 @@ class TestGraph(object):
                             + ", ".join(n.id for n in occupied_at)
                         )
                         # allow reentrancy as best shot at recovering from an otherwise fatal error
+                        # TODO: could reentrancy lead to unrecoverable asyncio loop? next time we get
+                        # hanging check for the warning below. the tests must be parallely runnable
+                        # without resource conflicts so maybe the failed worker doesn't end up as completed task?
+                        logging.critical(f"Reentrancy by {worker.id}!")
                         next.params["max_concurrent_tries"] = (
                             next.params.get_numeric("max_concurrent_tries", 0) + 1
                         )
