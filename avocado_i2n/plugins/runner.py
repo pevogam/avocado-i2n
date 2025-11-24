@@ -64,7 +64,7 @@ class TestRunner(RunnerInterface):
 
     def __init__(self) -> None:
         """Construct minimal attributes for the Cartesian runner."""
-        self.tasks = []
+        self.tasks = {}
 
         self.status_repo = None
         self.status_server = None
@@ -83,11 +83,7 @@ class TestRunner(RunnerInterface):
                 continue
 
             message = self.status_repo.get_task_data(task_id, index)
-            tasks_by_id = {
-                str(runtime_task.task.identifier): runtime_task.task
-                for runtime_task in self.tasks
-            }
-            task = tasks_by_id.get(task_id)
+            task = self.tasks.get(task_id)
             message_handler.process_message(message, task, self.job)
 
     def all_results_ok(self) -> bool:
@@ -203,7 +199,12 @@ class TestRunner(RunnerInterface):
                 task.spawner_handle = host
             elif spawner == "remote":
                 task.spawner_handle = node.started_worker.get_session()
-        self.tasks += tasks
+        self.tasks.update(
+            {
+                str(runtime_task.task.identifier): runtime_task.task
+                for runtime_task in tasks
+            }
+        )
 
         # TODO: use a single state machine for all test nodes when we are able
         # to at least add requested tasks to it safely (using its locks)
@@ -363,7 +364,7 @@ class TestRunner(RunnerInterface):
 
         self.job = job
         self.test_suite = test_suite
-        self.tasks = []
+        self.tasks = {}
 
         self.status_repo = StatusRepo(self.job.unique_id)
         self.status_server = StatusServer(
@@ -408,9 +409,7 @@ class TestRunner(RunnerInterface):
         # Update the overall summary with found test statuses, which will
         # determine the Avocado command line exit status
         test_ids = [
-            runtime_task.task.identifier
-            for runtime_task in self.tasks
-            if runtime_task.task.category == "test"
+            task.identifier for task in self.tasks.values() if task.category == "test"
         ]
         summary.update(
             [
