@@ -2150,6 +2150,8 @@ class TestGraph(object):
                 # postpone this worker as it might traverse most of the graph (better done when nothing else to do)
                 await asyncio.sleep(occupied_timeout)
                 continue
+            elif next in occupied_at:
+                occupied_at.remove(next)
 
             logging.debug(
                 "Worker %s at test node %s which is %sready with setup and %sready with cleanup",
