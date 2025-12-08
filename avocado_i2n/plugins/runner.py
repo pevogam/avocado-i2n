@@ -29,6 +29,7 @@ INTERFACE
 from __future__ import annotations
 
 import os
+import re
 import time
 import json
 import logging as log
@@ -201,6 +202,21 @@ class TestRunner(RunnerInterface):
                 task.spawner_handle = host
             elif spawner == "remote":
                 task.spawner_handle = node.started_worker.get_session()
+                while True:
+                    io_pressure = task.spawner_handle.cmd(
+                        "cat /sys/fs/cgroup/io.pressure | grep full"
+                    )
+                    io_pressure_stat = float(
+                        re.search(r"avg60=(\d+.\d+)", io_pressure).group(1)
+                    )
+                    if io_pressure_stat >= 10.0:
+                        logging.warning(
+                            f"Waiting 60s due to high IO 60s window pressure: {io_pressure}"
+                        )
+                        time.sleep(60)
+                    else:
+                        break
+
         self.tasks.update(
             {
                 str(runtime_task.task.identifier): runtime_task.task
