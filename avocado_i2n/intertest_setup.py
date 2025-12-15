@@ -270,18 +270,12 @@ def update(config: dict[str, Any], tag: str = "") -> None:
             # NOTE: this makes sure that any present states are overwritten and no recreated
             # states are removed, aborting in any other case
             setup_dict.update({"get_mode": "ra", "set_mode": "ff", "unset_mode": "fi"})
-            setup_str = vm_params.get("remove_set", "leaves")
-            for restriction in config["available_restrictions"]:
-                if restriction in setup_str:
-                    break
-            else:
-                setup_str = "all.." + setup_str
+            setup_str = config["tests_str"]
 
             logging.info(
                 f"Flagging for removing by {worker.id} all old {vm_name} states "
                 f"depending on the updated '{to_state}'"
             )
-            setup_str = param.re_str(setup_str)
             try:
                 clean_graph = l.parse_object_trees(
                     worker=worker,
@@ -317,7 +311,7 @@ def update(config: dict[str, Any], tag: str = "") -> None:
                     logging.error(error)
                     raise ValueError(
                         f"Could not identify a test node from {vm_name}'s to_state='{flag_state}', "
-                        f"is it compatible with the default or specified remove_set?"
+                        f"is it compatible with the default or specified remove set restriction?"
                     )
 
             logging.info(
@@ -386,7 +380,7 @@ def update(config: dict[str, Any], tag: str = "") -> None:
                         logging.error(error)
                         raise ValueError(
                             f"Could not identify a test node from {vm_name}'s from_state='{from_state}', "
-                            f"is it compatible with the default or specified remove_set?"
+                            f"is it compatible with the default or specified remove set restriction?"
                         )
 
             graph.new_objects([o for o in clean_graph.objects if o.key == "nets"])

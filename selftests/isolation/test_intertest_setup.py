@@ -47,7 +47,7 @@ class IntertestSetupTest(Test):
         self.config["available_restrictions"] = ["leaves", "normal", "minimal"]
         self.config["param_dict"] = {"nets": "net1"}
         self.config["vm_strs"] = self.config["available_vms"].copy()
-        self.config["tests_str"] = {}
+        self.config["tests_str"] = "only leaves"
         self.config["tests_params"] = utils_params.Params()
         self.config["vms_params"] = utils_params.Params()
 
@@ -211,7 +211,7 @@ class IntertestSetupTest(Test):
 
     def test_update_remove_set(self):
         """Test the remove set usage of the manual update-cache tool."""
-        self.config["vms_params"]["remove_set"] = "minimal"
+        self.config["tests_str"] = "only minimal"
         self.config["vm_strs"] = {"vm1": "only CentOS\n"}
         DummyStateControl.asserted_states["unset"] = {"on_customize": {self.shared_pool: 0}, "connect": {self.shared_pool: 0}}
         DummyTestRun.asserted_tests = [
@@ -226,7 +226,21 @@ class IntertestSetupTest(Test):
         # states outside of the remove set would not be touched
         self.assertEqual(DummyStateControl.asserted_states["unset"]["connect"][self.shared_pool], 0)
 
-        self.config["vms_params"]["remove_set"] = "tutorial1"
+        self.config["tests_str"] = "only tutorial1\nonly normal"
+        DummyStateControl.asserted_states["unset"] = {"on_customize": {self.shared_pool: 0}, "connect": {self.shared_pool: 0}}
+        DummyTestRun.asserted_tests = [
+            {"shortname": "^internal.stateless.noop.vm1", "vms": "^vm1$", "type": "^shared_configure_install$"},
+            {"shortname": "^original.unattended_install.*vm1", "vms": "^vm1$", "cdrom_cd1": r".*CentOS-8.*\.iso$"},
+            {"shortname": "^internal.automated.customize.vm1", "vms": "^vm1$"},
+        ]
+        intertest_setup.update(self.config, tag="0")
+        self.assertEqual(len(DummyTestRun.asserted_tests), 0, "Some tests weren't run: %s" % DummyTestRun.asserted_tests)
+        # states within the remove set (only) would be removed if they are descendants of updated test node
+        self.assertEqual(DummyStateControl.asserted_states["unset"]["on_customize"][self.shared_pool], 1)
+        # states outside of the remove set would not be touched
+        self.assertEqual(DummyStateControl.asserted_states["unset"]["connect"][self.shared_pool], 0)
+
+        self.config["tests_str"] = "only minimal..tutorial1"
         DummyStateControl.asserted_states["unset"] = {"on_customize": {self.shared_pool: 0}, "connect": {self.shared_pool: 0}}
         DummyTestRun.asserted_tests = [
             {"shortname": "^internal.stateless.noop.vm1", "vms": "^vm1$", "type": "^shared_configure_install$"},
@@ -240,21 +254,7 @@ class IntertestSetupTest(Test):
         # states outside of the remove set would not be touched
         self.assertEqual(DummyStateControl.asserted_states["unset"]["connect"][self.shared_pool], 0)
 
-        self.config["vms_params"]["remove_set"] = "minimal..tutorial1"
-        DummyStateControl.asserted_states["unset"] = {"on_customize": {self.shared_pool: 0}, "connect": {self.shared_pool: 0}}
-        DummyTestRun.asserted_tests = [
-            {"shortname": "^internal.stateless.noop.vm1", "vms": "^vm1$", "type": "^shared_configure_install$"},
-            {"shortname": "^original.unattended_install.*vm1", "vms": "^vm1$", "cdrom_cd1": r".*CentOS-8.*\.iso$"},
-            {"shortname": "^internal.automated.customize.vm1", "vms": "^vm1$"},
-        ]
-        intertest_setup.update(self.config, tag="0")
-        self.assertEqual(len(DummyTestRun.asserted_tests), 0, "Some tests weren't run: %s" % DummyTestRun.asserted_tests)
-        # states within the remove set would be removed if they are descendants of updated test node
-        self.assertEqual(DummyStateControl.asserted_states["unset"]["on_customize"][self.shared_pool], 1)
-        # states outside of the remove set would not be touched
-        self.assertEqual(DummyStateControl.asserted_states["unset"]["connect"][self.shared_pool], 0)
-
-        self.config["vms_params"]["remove_set"] = "minimal"
+        self.config["tests_str"] = "only minimal"
         self.config["vm_strs"] = {"vm1": "only CentOS\n", "vm2": "only Win10\n"}
         DummyTestRun.asserted_tests = [
             {"shortname": "^internal.stateless.noop.vm1", "vms": "^vm1$", "type": "^shared_configure_install$"},
@@ -270,7 +270,7 @@ class IntertestSetupTest(Test):
     def test_update_restrictions(self):
         """Test object variant restrictions with the manual update-cache tool."""
         self.config["param_dict"]["nets"] = "net1 net2 net5"
-        self.config["vms_params"]["remove_set"] = "all..tutorial_gui..client_clicked"
+        self.config["tests_str"] = "only normal..tutorial_gui..client_clicked"
         self.config["vms_params"]["from_state_vm2"] = "customize"
         self.config["vm_strs"] = {"vm1": "", "vm2": "only Win7\n"}
         # TODO: consider simplifying the fact that the cleanup graph will use all available vms
