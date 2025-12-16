@@ -367,17 +367,17 @@ class TestGraph(object):
                 param_key="name", param_val=test_node.setless_form + "$"
             )
             if len(matching_nodes) == 0:
-                logging.debug(f"Skip flag for non-overlapping {test_node}")
+                logging.debug(f"Dot not set flag for non-overlapping {test_node}")
                 continue
             elif len(matching_nodes) > 1:
                 raise ValueError(
                     f"Cannot map {test_node} into a unique test node from {graph}"
                 )
             if test_node.is_shared_root() and skip_shared_root:
-                logging.info("Skip flag for shared root")
+                logging.info("Dot not set for shared root")
                 continue
             if test_node.is_object_root() and skip_object_roots:
-                logging.info("Skip flag for object root")
+                logging.info("Dot not set for object root")
                 continue
             logging.debug(f"The test {test_node} is assigned custom {activity} policy")
             if flag_type == "run":

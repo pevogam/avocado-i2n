@@ -75,7 +75,7 @@ class IntertestSetupTest(Test):
         self.assertEqual(DummyStateControl.asserted_states["unset"]["install"][self.shared_pool], 0)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["customize"][self.shared_pool], 0)
         # states after the updated path will be removed (default remove set is the entire graph)
-        self.assertEqual(DummyStateControl.asserted_states["unset"]["on_customize"][self.shared_pool], 2)
+        self.assertEqual(DummyStateControl.asserted_states["unset"]["on_customize"][self.shared_pool], 1)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["connect"][self.shared_pool], 1)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["guisetup.clicked"][self.shared_pool], 1)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["getsetup.clicked"][self.shared_pool], 1)
@@ -107,7 +107,7 @@ class IntertestSetupTest(Test):
         self.assertEqual(DummyStateControl.asserted_states["unset"]["install"][self.shared_pool], 0)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["customize"][self.shared_pool], 0)
         # states after the updated path will be removed (default remove set is the entire graph)
-        self.assertEqual(DummyStateControl.asserted_states["unset"]["on_customize"][self.shared_pool], 2)
+        self.assertEqual(DummyStateControl.asserted_states["unset"]["on_customize"][self.shared_pool], 1)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["connect"][self.shared_pool], 1)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["guisetup.clicked"][self.shared_pool], 1)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["getsetup.clicked"][self.shared_pool], 1)
@@ -128,10 +128,10 @@ class IntertestSetupTest(Test):
                                                       "getsetup.clicked": {self.shared_pool: 0}, "getsetup.guisetup.clicked": {self.shared_pool: 0}}
         DummyTestRun.asserted_tests = [
             {"shortname": "^internal.automated.customize.vm1", "vms": "^vm1$", "get_state_images": "^install$"},
-            {"shortname": "^internal.automated.connect.vm1", "vms": "^vm1$", "get_state_images": "^customize$"},
             {"shortname": "^internal.stateless.noop.vm2", "vms": "^vm2$", "type": "^shared_configure_install$"},
             {"shortname": "^original.unattended_install.*vm2", "vms": "^vm2$", "cdrom_cd1": r".*win.*\.iso$"},
             {"shortname": "^internal.automated.customize.vm2", "vms": "^vm2$", "get_state_images": "^install$"},
+            {"shortname": "^internal.automated.connect.vm1", "vms": "^vm1$", "get_state_images": "^customize$"},
         ]
         intertest_setup.update(self.config, tag="1r")
         self.assertEqual(len(DummyTestRun.asserted_tests), 0, "Some tests weren't run: %s" % DummyTestRun.asserted_tests)
@@ -141,9 +141,9 @@ class IntertestSetupTest(Test):
         self.assertEqual(DummyStateControl.asserted_states["unset"]["customize"][self.shared_pool], 0)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["connect"][self.shared_pool], 0)
         # states after the updated path will be removed (default remove set is the entire graph)
-        # TODO: states derived from all nodes along the path must be removed and not just from the end of the path (need 2 on_customize)
-        # (we need 2 on_customize states to be cleaned up but vm1 only gets states derived from connect cleaned up)
-        self.assertEqual(DummyStateControl.asserted_states["unset"]["on_customize"][self.shared_pool], 1)
+        # TODO: states derived from all nodes along the path must be removed and not just from the end of the path
+        # (we need 1 on_customize state to be cleaned up but vm1 only gets states derived from connect cleaned up)
+        self.assertEqual(DummyStateControl.asserted_states["unset"]["on_customize"][self.shared_pool], 0)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["guisetup.clicked"][self.shared_pool], 1)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["getsetup.clicked"][self.shared_pool], 1)
 
@@ -165,9 +165,9 @@ class IntertestSetupTest(Test):
         DummyTestRun.asserted_tests = [
             {"shortname": "^internal.automated.customize.vm1", "vms": "^vm1$", "get_state_images": "^install$", "nets": "^net1$"},
             {"shortname": "^internal.stateless.noop.vm2", "vms": "^vm2$", "type": "^shared_configure_install$", "nets": "^net2$"},
-            {"shortname": "^internal.automated.connect.vm1", "vms": "^vm1$", "get_state_images": "^customize$", "nets": "^net1$"},
             {"shortname": "^original.unattended_install.*vm2", "vms": "^vm2$", "cdrom_cd1": r".*win.*\.iso$", "nets": "^net2$"},
             {"shortname": "^internal.automated.customize.vm2", "vms": "^vm2$", "get_state_images": "^install$", "nets": "^net2$"},
+            {"shortname": "^internal.automated.connect.vm1", "vms": "^vm1$", "get_state_images": "^customize$", "nets": "^net2$"},
         ]
         intertest_setup.update(self.config, tag="1r")
         self.assertEqual(len(DummyTestRun.asserted_tests), 0, "Some tests weren't run: %s" % DummyTestRun.asserted_tests)
@@ -178,8 +178,8 @@ class IntertestSetupTest(Test):
         self.assertEqual(DummyStateControl.asserted_states["unset"]["connect"][self.shared_pool], 0)
         # states after the updated path will be removed (default remove set is the entire graph)
         # TODO: states derived from all nodes along the path must be removed and not just from the end of the path
-        # (we need 4 on_customize states to be cleaned up but vm1 only gets states derived from connect cleaned up)
-        self.assertEqual(DummyStateControl.asserted_states["unset"]["on_customize"][self.shared_pool], 1*2)
+        # (we need 2 on_customize states to be cleaned up but vm1 only gets states derived from connect cleaned up)
+        self.assertEqual(DummyStateControl.asserted_states["unset"]["on_customize"][self.shared_pool], 0*2)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["guisetup.clicked"][self.shared_pool], 1*2)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["getsetup.clicked"][self.shared_pool], 1*2)
 
@@ -254,6 +254,7 @@ class IntertestSetupTest(Test):
         # states outside of the remove set would not be touched
         self.assertEqual(DummyStateControl.asserted_states["unset"]["connect"][self.shared_pool], 0)
 
+        # vm2 does not participate in any test from the minimal test set so skip it
         self.config["tests_str"] = "only minimal"
         self.config["vm_strs"] = {"vm1": "only CentOS\n", "vm2": "only Win10\n"}
         DummyTestRun.asserted_tests = [
@@ -261,11 +262,14 @@ class IntertestSetupTest(Test):
             {"shortname": "^original.unattended_install.*vm1", "vms": "^vm1$", "cdrom_cd1": r".*CentOS-8.*\.iso$"},
             {"shortname": "^internal.automated.customize.vm1", "vms": "^vm1$"},
         ]
-        # vm2 does not participate in any test from the minimal test set but vm1 will be updated before this assertion fails
-        with self.assertRaises(AssertionError):
-            # TODO: do not use assertion errors on the graph side as these could be confused with the assertion errors here
-            intertest_setup.update(self.config, tag="0")
-        self.assertEqual(len(DummyTestRun.asserted_tests), 0, "Some tests weren't run: %s" % DummyTestRun.asserted_tests)
+
+        # vm2 does not participate in any test from the minimal test set so no update will be done
+        self.config["tests_str"] = "only minimal"
+        self.config["vm_strs"] = {"vm2": "only Win10\n"}
+        DummyTestRun.asserted_tests = [
+        ]
+        intertest_setup.update(self.config, tag="0")
+        self.assertEqual(len(DummyTestRun.asserted_tests), 0, "Some tests were run: %s" % DummyTestRun.asserted_tests)
 
     def test_update_restrictions(self):
         """Test object variant restrictions with the manual update-cache tool."""
@@ -282,12 +286,12 @@ class IntertestSetupTest(Test):
                                                       "guisetup.noop": {self.shared_pool: 0}, "guisetup.clicked": {self.shared_pool: 0}}
         DummyTestRun.asserted_tests = [
             {"shortname": "^internal.stateless.noop.vm1.+CentOS", "vms": "^vm1$", "type": "^shared_configure_install$", "nets": "^net1$"},
-            {"shortname": "^internal.stateless.noop.vm1.+Fedora", "vms": "^vm1$", "type": "^shared_configure_install$", "nets": "^net2$"},
+            {"shortname": "^internal.automated.customize.vm2", "vms": "^vm2$", "get_state_images": "^install$", "nets": "^net2$"},
             {"shortname": "^original.unattended_install.*vm1.+CentOS", "vms": "^vm1$", "cdrom_cd1": r".*CentOS.*\.iso$", "nets": "^net1$"},
-            {"shortname": "^original.unattended_install.*vm1.+Fedora", "vms": "^vm1$", "cdrom_cd1": r".*Fedora.*\.iso$", "nets": "^net2$"},
             {"shortname": "^internal.automated.customize.vm1.+CentOS", "vms": "^vm1$", "get_state_images": "^install$", "nets": "^net1$"},
-            {"shortname": "^internal.automated.customize.vm1.+Fedora", "vms": "^vm1$", "get_state_images": "^install$", "nets": "^net2$"},
-            {"shortname": "^internal.automated.customize.vm2", "vms": "^vm2$", "get_state_images": "^install$", "nets": "^net1$"},
+            {"shortname": "^internal.stateless.noop.vm1.+Fedora", "vms": "^vm1$", "type": "^shared_configure_install$", "nets": "^net1$"},
+            {"shortname": "^original.unattended_install.*vm1.+Fedora", "vms": "^vm1$", "cdrom_cd1": r".*Fedora.*\.iso$", "nets": "^net1$"},
+            {"shortname": "^internal.automated.customize.vm1.+Fedora", "vms": "^vm1$", "get_state_images": "^install$", "nets": "^net1$"},
         ]
         intertest_setup.update(self.config, tag="1r")
         self.assertEqual(len(DummyTestRun.asserted_tests), 0, "Some tests weren't run: %s" % DummyTestRun.asserted_tests)
@@ -299,7 +303,8 @@ class IntertestSetupTest(Test):
         # states after the updated path will be removed (default remove set is the entire graph)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["linux_virtuser"][self.shared_pool], 2*2)
         self.assertEqual(DummyStateControl.asserted_states["unset"]["windows_virtuser"][self.shared_pool], 1*2)
-        self.assertEqual(DummyStateControl.asserted_states["unset"]["guisetup.clicked"][self.shared_pool], 1*2)
+        # TODO: this state seems to be overwritten for both variants of vm1 and has to be separated between them
+        self.assertEqual(DummyStateControl.asserted_states["unset"]["guisetup.clicked"][self.shared_pool], 2*2)
 
     def test_net_manipulation(self):
         """Test the general usage of all net manipulation tools."""

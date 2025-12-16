@@ -51,7 +51,14 @@ def permubuntu(config, tag=""):
     LOG_UI.info("Starting permanent vm setup for %s (%s)",
                 ", ".join(selected_vms), os.path.basename(r.job.logdir))
 
-    update(config, tag=tag)
+    # configure the update tool for remove test set independent behavior
+    for vm_name in selected_vms:
+        config["param_dict"]["vms"] = vm_name
+        config["param_dict"]["main_vm"] = vm_name
+        # in case of permanent vms, support creation and other otherwise dangerous operations
+        config["param_dict"]["create_permanent_vm"] = "yes"
+        config["tests_str"] = "only all..customize"
+        update(config, tag=tag)
 
     graph = TestGraph()
     graph.new_workers(l.parse_workers(config["param_dict"]))

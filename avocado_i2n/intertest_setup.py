@@ -252,51 +252,52 @@ def update(config: dict[str, Any], tag: str = "") -> None:
         for new_vm in new_vms:
             graph.new_objects(TestGraph.parse_components_for_object(new_vm, "vms"))
 
-    for i, vm_name in enumerate(selected_vms):
-        vm_params = config["vms_params"].object_params(vm_name)
-        vm_objects = graph.get_objects(param_val=vm_name)
-        from_state = vm_params.get("from_state", "install")
-        to_state = vm_params.get("to_state", "customize")
-        logging.info("Updating state '%s' of %s", to_state, vm_name)
+    # parse individual net only for the current vm
+    for i, worker in enumerate(graph.workers.values()):
+        setup_dict = config["param_dict"].copy()
+        setup_dict["nets"] = worker.id
+        # NOTE: this makes sure that any present states are overwritten and no recreated
+        # states are removed, aborting in any other case
+        setup_dict.update({"get_mode": "ra", "set_mode": "ff", "unset_mode": "fi"})
+        setup_str = config["tests_str"]
 
-        # parse individual net only for the current vm
-        for worker in graph.workers.values():
-            setup_dict = config["param_dict"].copy()
-            # in case of permanent vms, support creation and other otherwise dangerous operations
-            setup_dict["create_permanent_vm"] = "yes"
+        try:
+            clean_graph = l.parse_object_trees(
+                worker=worker,
+                restriction=setup_str,
+                prefix=f"{tag}m{i + 1}",
+                object_restrs=config["available_vms"],
+                params=setup_dict,
+                verbose=False,
+                with_shared_root=False,
+            )
+        except param.EmptyCartesianProduct as error:
+            logging.warning(error)
+            continue
+        # flagging children will require connected graphs while flagging intersection can also handle disconnected ones
+        clean_graph.flag_intersection(
+            clean_graph, flag_type="run", flag=lambda self, slot: False
+        )
+        clean_graph.flag_intersection(
+            clean_graph, flag_type="clean", flag=lambda self, slot: False
+        )
+
+        for i, vm_name in enumerate(selected_vms):
             setup_dict["main_vm"] = vm_name
             setup_dict["vms"] = vm_name
-            setup_dict["nets"] = worker.id
-            # NOTE: this makes sure that any present states are overwritten and no recreated
-            # states are removed, aborting in any other case
-            setup_dict.update({"get_mode": "ra", "set_mode": "ff", "unset_mode": "fi"})
-            setup_str = config["tests_str"]
+            vm_params = config["vms_params"].object_params(vm_name)
+            from_state = vm_params.get("from_state", "install")
+            to_state = vm_params.get("to_state", "customize")
+            logging.info("Updating state '%s' of %s", to_state, vm_name)
 
             logging.info(
                 f"Flagging for removing by {worker.id} all old {vm_name} states "
                 f"depending on the updated '{to_state}'"
             )
-            try:
-                clean_graph = l.parse_object_trees(
-                    worker=worker,
-                    restriction=setup_str,
-                    prefix=f"{tag}m{i + 1}",
-                    object_restrs=config["available_vms"],
-                    params=setup_dict,
-                    verbose=False,
-                    with_shared_root=False,
-                )
-            except param.EmptyCartesianProduct as error:
-                logging.warning(error)
-                continue
-            # flagging children will require connected graphs while flagging intersection can also handle disconnected ones
-            clean_graph.flag_intersection(
-                clean_graph, flag_type="run", flag=lambda self, slot: False
-            )
-            clean_graph.flag_intersection(
-                clean_graph, flag_type="clean", flag=lambda self, slot: False
-            )
             flag_state = "" if to_state == "install" else to_state
+            vm_objects = [
+                o for o in clean_graph.get_objects(param_val=vm_name) if o.key == "vms"
+            ]
             for vm_object in vm_objects:
                 try:
                     clean_graph.flag_children(
@@ -383,8 +384,8 @@ def update(config: dict[str, Any], tag: str = "") -> None:
                             f"is it compatible with the default or specified remove set restriction?"
                         )
 
-            graph.new_objects([o for o in clean_graph.objects if o.key == "nets"])
-            graph.new_nodes(clean_graph.nodes)
+        graph.new_objects([o for o in clean_graph.objects if o.key == "nets"])
+        graph.new_nodes(clean_graph.nodes)
 
     logging.info(f"Bridging worker subgraphs across workers")
     for node1 in graph.nodes:
