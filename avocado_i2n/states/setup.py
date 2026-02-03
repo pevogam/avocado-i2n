@@ -36,7 +36,6 @@ from avocado_vt.test import VirtTest
 from virttest.utils_env import Env
 from virttest.utils_params import Params
 
-
 logging = log.getLogger("avocado.job." + __name__)
 
 

@@ -43,7 +43,6 @@ from .netconfig import VMNetconfig
 from .interface import VMInterface
 from .node import VMNode
 
-
 logging = log.getLogger("avocado.job." + __name__)
 
 

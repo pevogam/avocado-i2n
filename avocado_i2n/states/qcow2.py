@@ -39,7 +39,6 @@ from virttest.utils_params import Params
 
 from .pool import RootSourcedStateBackend, SourcedStateBackend
 
-
 logging = log.getLogger("avocado.job." + __name__)
 
 

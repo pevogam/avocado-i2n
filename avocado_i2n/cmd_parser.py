@@ -42,7 +42,6 @@ from . import params_parser as param
 from .cartgraph import graph
 from .states import setup as ss
 
-
 log = logging.getLogger("avocado.job." + __name__)
 
 
@@ -91,7 +90,7 @@ def params_from_cmd(config: Params) -> None:
                 f"Found malformed parameter on the command line '{cmd_param}' - "
                 f"must be of the form <key>=<val>"
             )
-        (key, value) = re_param.group(1, 2)
+        key, value = re_param.group(1, 2)
         if key == "only" or key == "no":
             # detect if this is the primary restriction to escape defaults
             for variant in re.split(r",|\.|\.\.", value):

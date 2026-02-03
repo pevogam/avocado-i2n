@@ -67,7 +67,6 @@ from .node import VMNode
 from .netconfig import VMNetconfig
 from .tunnel import VMTunnel
 
-
 logging = log.getLogger("avocado.job." + __name__)
 
 

@@ -66,7 +66,6 @@ from . import params_parser as param
 from .cartgraph import TestGraph, TestNode
 from .plugins.runner import TestRunner
 
-
 logging = log.getLogger("avocado.job." + __name__)
 
 

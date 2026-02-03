@@ -38,7 +38,6 @@ from virttest.utils_params import Params
 
 from . import NetObject
 
-
 logging = log.getLogger("avocado.job." + __name__)
 
 

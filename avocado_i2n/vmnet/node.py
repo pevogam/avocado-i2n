@@ -39,7 +39,6 @@ from aexpect.client import RemoteSession
 from virttest.utils_params import Params
 from virttest.qemu_vm import VM
 
-
 logging = log.getLogger("avocado.job." + __name__)
 
 

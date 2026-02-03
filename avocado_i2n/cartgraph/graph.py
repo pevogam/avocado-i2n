@@ -48,7 +48,6 @@ from . import PrefixTreeNode, PrefixTree, TestNode
 from . import TestSwarm, TestWorker
 from . import TestObject, NetObject, VMObject, ImageObject
 
-
 logging = log.getLogger("avocado.job." + __name__)
 
 

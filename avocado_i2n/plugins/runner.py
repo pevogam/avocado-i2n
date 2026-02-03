@@ -53,7 +53,6 @@ from virttest.utils_params import Params
 
 from ..cartgraph import TestGraph, TestWorker, TestNode
 
-
 logging = log.getLogger("avocado.job." + __name__)
 
 
@@ -77,7 +76,7 @@ class TestRunner(RunnerInterface):
         message_handler = MessageHandler()
         while True:
             try:
-                (_, task_id, _, index) = self.status_repo.status_journal_summary_pop()
+                _, task_id, _, index = self.status_repo.status_journal_summary_pop()
 
             except IndexError:
                 await asyncio.sleep(0.05)

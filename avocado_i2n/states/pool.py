@@ -46,7 +46,6 @@ from virttest.qemu_storage import QemuImg
 
 from .setup import StateBackend
 
-
 logging = log.getLogger("avocado.job." + __name__)
 
 

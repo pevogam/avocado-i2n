@@ -35,7 +35,6 @@ from .. import cmd_parser
 from .. import params_parser as param
 from ..cartgraph import TestGraph
 
-
 log = logging.getLogger("avocado.job." + __name__)
 
 

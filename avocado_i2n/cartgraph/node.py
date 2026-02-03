@@ -44,7 +44,6 @@ from virttest.utils_params import Params
 from . import TestSwarm, TestWorker, TestObject, NetObject
 from .. import params_parser as param
 
-
 logging = log.getLogger("avocado.job." + __name__)
 
 

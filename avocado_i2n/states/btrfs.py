@@ -25,6 +25,7 @@ INTERFACE
 ------------------------------------------------------
 
 """
+
 from typing import Any
 
 from virttest.utils_params import Params
