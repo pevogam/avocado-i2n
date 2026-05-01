@@ -83,7 +83,7 @@ class ParamsParserTest(Test):
         self.assertEqual(mock_parse_file.mock_calls[0].args[1], file_key.split()[1])
         self.assertIn(file_key, config._parse_cache)
         self.assertIsNotNone(
-            config._parse_cache[file_key]['parser'],
+            config._parse_cache[file_key]['ast'],
             "cached parser must be stored for the file parsing step"
         )
         self.assertEqual(
@@ -94,7 +94,7 @@ class ParamsParserTest(Test):
         self.assertEqual(mock_parse_string.mock_calls[3].args[1], str_key)
         self.assertIn(str_key, config._parse_cache[file_key]['children'])
         self.assertIsNotNone(
-            config._parse_cache[file_key]['children'][str_key]['parser'],
+            config._parse_cache[file_key]['children'][str_key]['ast'],
             "cached parser must be stored for the string parsing step"
         )
         self.assertEqual(
@@ -105,7 +105,7 @@ class ParamsParserTest(Test):
         self.assertEqual(mock_parse_string.mock_calls[4].args[1], dict_key)
         self.assertIn(dict_key, config._parse_cache[file_key]['children'][str_key]['children'])
         self.assertIsNotNone(
-            config._parse_cache[file_key]['children'][str_key]['children'][dict_key]['parser'],
+            config._parse_cache[file_key]['children'][str_key]['children'][dict_key]['ast'],
             "cached parser must be stored for the dictionary parsing step"
         )
         self.assertEqual(
@@ -196,7 +196,7 @@ class ParamsParserTest(Test):
         )
         self.assertIn(dict_key, config._parse_cache[file_key]['children'][str_key]['children'])
         self.assertIsNotNone(
-            config._parse_cache[file_key]['children'][str_key]['children'][dict_key2]['parser'],
+            config._parse_cache[file_key]['children'][str_key]['children'][dict_key2]['ast'],
             "cached parser must be stored for the dictionary parsing step"
         )
         self.assertEqual(

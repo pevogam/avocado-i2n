@@ -31,7 +31,7 @@ import copy
 import collections
 import logging
 
-from cartconf.parser import Parser
+from cartconf.parser import Parser, Tree
 from virttest.utils_params import Params
 from avocado.core.settings import settings
 
@@ -247,7 +247,7 @@ class Reparsable:
     """
 
     #: cache for parsers of already parsed steps to copy from for faster overall parsed graph
-    #: nested structure: _parse_cache[step1_key] = {'parser': parser_after_step1, 'children': {step2_key: ...}}
+    #: nested structure: _parse_cache[step1_key] = {'ast': parsed_ast_after_step1, 'children': {step2_key: ...}}
     _parse_cache = {}
 
     def __init__(self) -> None:
@@ -255,38 +255,38 @@ class Reparsable:
         self.steps = []
 
     @classmethod
-    def _get_cached_parser_depth(cls, steps: list[ParsedContent]) -> tuple[Parser, int]:
+    def _get_cached_ast_depth(cls, steps: list[ParsedContent]) -> tuple[Tree, int]:
         """
-        Get a cached parser for a maximum number of already parsed initial steps.
+        Get a cached AST for a maximum number of already parsed initial steps.
 
         :param steps: complete list of parsing steps
         :returns: a tuple of (cached_parser, depth) where depth is the number of steps
                   the cached parser has already processed, or (None, 0) if no cache exists
         """
         cache_ref = cls._parse_cache
-        cached_parser, depth = None, 0
+        cached_ast, depth = None, 0
 
         for step in steps:
             key = step.parsable_form()
             if key in cache_ref:
                 entry = cache_ref[key]
-                if entry['parser'] is not None:
-                    cached_parser = entry['parser']
+                if entry['ast'] is not None:
+                    cached_ast = entry['ast']
                     depth += 1
                 cache_ref = entry['children']
             else:
                 # No further cache found
                 break
 
-        return cached_parser, depth
+        return cached_ast, depth
 
     @classmethod
-    def _cache_parser(cls, steps: list[ParsedContent], parser: Parser) -> None:
+    def _cache_ast(cls, steps: list[ParsedContent], ast: Tree) -> None:
         """
-        Cache a parser for the given sequence of steps.
+        Cache an AST for the given sequence of steps.
 
-        :param steps: the sequence of parsing steps up to this parser
-        :param parser: the parser to cache
+        :param steps: the sequence of parsing steps up to this AST
+        :param ast: the AST to cache
         """
         cache_ref = cls._parse_cache
         for i, step in enumerate(steps):
@@ -297,7 +297,7 @@ class Reparsable:
                         f"Cache should already exist for step {i} "
                         f"when caching parser for steps: {[s.reportable_form() for s in steps]}"
                     )
-                cache_ref[key] = {'parser': parser, 'children': {}}
+                cache_ref[key] = {'ast': ast, 'children': {}}
             # TODO: what if also the final key in cache ref?? 
             cache_ref = cache_ref[key]['children']
 
@@ -400,17 +400,17 @@ class Reparsable:
         :raises: :py:class:`EmptyCartesianProduct` if no combination of the restrictions exists
         """
         # try to retrieve a cached parser from previous steps
-        cached_parser, cache_depth = self._get_cached_parser_depth(self.steps)
+        cached_ast, cache_depth = self._get_cached_ast_depth(self.steps)
 
-        # start with most-steps cached parser if any or create new one
-        if cached_parser is not None:
+        # start with most-steps cached AST if any or create new one
+        parser = Parser()
+        if cached_ast is not None:
             # TODO: need resettable parser or AST or PreDict to not have to copy
             # parser = cached_parser
             # TODO: shallow copy is too shallow, deepcopy cannot pickle due to rust nodes
-            parser = copy.copy(cached_parser)
+            parser.ast = copy.copy(cached_ast)
             start_step_index = cache_depth
         else:
-            parser = Parser()
             start_step_index = 0
 
         # Parse the base settings only once (if starting fresh)
@@ -435,7 +435,7 @@ class Reparsable:
 
             # Cache the parser after each step
             # TODO: shallow copy is too shallow, deepcopy cannot pickle due to rust nodes
-            self._cache_parser(self.steps[:i + 1], copy.copy(parser))
+            self._cache_ast(self.steps[:i + 1], copy.copy(parser.ast))
 
         # log any required information and detect empty Cartesian product
         if show_restriction:
