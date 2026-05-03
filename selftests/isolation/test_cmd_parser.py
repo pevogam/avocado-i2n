@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import os
+import tempfile
 import unittest
 import unittest_importer
 
@@ -13,9 +15,19 @@ class CmdParserTest(Test):
     def setUp(self):
         self.config = {}
         self.config["params"] = ["aaa=bbb"]
+        self.home = os.environ["HOME"]
+        self.overwrite_configs_dir = tempfile.mkdtemp()
+        os.environ["HOME"] = self.overwrite_configs_dir
 
     def tearDown(self):
-        pass
+        os.environ["HOME"] = self.home
+        overwrite_vms = os.path.join(self.overwrite_configs_dir, "avocado_overwrite_vms.cfg")
+        overwrite_tests = os.path.join(self.overwrite_configs_dir, "avocado_overwrite_tests.cfg")
+        if os.path.exists(overwrite_vms):
+            os.unlink(overwrite_vms)
+        if os.path.exists(overwrite_tests):
+            os.unlink(overwrite_tests)
+        os.rmdir(self.overwrite_configs_dir)
 
     def test_param_dict(self):
         cmd.params_from_cmd(self.config)
