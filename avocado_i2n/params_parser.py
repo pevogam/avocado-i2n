@@ -408,7 +408,7 @@ class Reparsable:
             # TODO: need resettable parser or AST or PreDict to not have to copy
             # parser = cached_parser
             # TODO: shallow copy is too shallow, deepcopy cannot pickle due to rust nodes
-            parser.ast = copy.copy(cached_ast)
+            parser.ast = cached_ast
             start_step_index = cache_depth
         else:
             start_step_index = 0
@@ -435,7 +435,7 @@ class Reparsable:
 
             # Cache the parser after each step
             # TODO: shallow copy is too shallow, deepcopy cannot pickle due to rust nodes
-            self._cache_ast(self.steps[:i + 1], copy.copy(parser.ast))
+            self._cache_ast(self.steps[:i + 1], parser.ast)
 
         # log any required information and detect empty Cartesian product
         if show_restriction:
