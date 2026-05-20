@@ -826,6 +826,16 @@ class TestNode(Runnable):
             should_run = should_run_from_scan if should_scan else False
             should_run = should_run or self.should_rerun(worker)
 
+        if os.path.exists("/tmp/skip_tests"):
+            with open("/tmp/skip_tests", "r") as f:
+                skip_variants = f.read().splitlines()
+            for skip_variant in skip_variants:
+                if skip_variant in self.params["name"].split("."):
+                    logging.info(
+                        f"Should not run {self} since it is listed in /tmp/skip_tests"
+                    )
+                    return False
+
         return should_run
 
     def default_clean_decision(self, worker: TestWorker) -> bool:
