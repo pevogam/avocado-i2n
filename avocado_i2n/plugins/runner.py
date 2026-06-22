@@ -365,7 +365,7 @@ class TestRunner(RunnerInterface):
             self.loop.run_until_complete(
                 asyncio.wait_for(
                     asyncio.shield(asyncio.gather(*to_traverse)),
-                    self.job.timeout or 86400,
+                    self.job.timeout or 300000,
                 )
             )
         except asyncio.TimeoutError as error:
