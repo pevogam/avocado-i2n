@@ -31,7 +31,7 @@ import copy
 import collections
 import logging
 
-from cartconf.parser import Parser
+from cartconf.parser import Parser, PreDict
 from virttest.utils_params import Params
 from avocado.core.settings import settings
 
@@ -249,6 +249,9 @@ class Reparsable:
     #: cache for parsers of already parsed steps to copy from for faster overall parsed graph
     #: nested structure: _parse_cache[step1_key] = {'parser': parser_after_step1, 'children': {step2_key: ...}}
     _parse_cache = {}
+    #: specialized read-only AST for parsing test objects and test nodes
+    object_ast = None
+    node_ast = None
 
     def __init__(self) -> None:
         """Initialize the parsable structure."""
@@ -268,6 +271,14 @@ class Reparsable:
 
         for step in steps:
             key = step.parsable_form()
+            if key == "vms.cfg":
+                # TODO: use pre-dict on top of global read-only test object AST
+                cached_parser = PreDict(cls.object_ast)
+                # TODO: every next step must be added to pre-dict
+            elif key == "tests.cfg":
+                # TODO: use pre-dict on top of global read-only (flat) test node AST
+                cached_parser = PreDict(cls.node_ast)
+                # TODO: every next step must be added to pre-dict
             if key in cache_ref:
                 entry = cache_ref[key]
                 if entry['parser'] is not None:
@@ -502,6 +513,24 @@ class Reparsable:
             show_empty_cartesian_product=True,
         )
 
+        # TODO: this includes giant str keys for dicts at present
+        logging.critical(
+            f"Recipe:\n{self}\n"
+        )
+        for key1 in self._parse_cache.keys():
+            logging.critical(f"1, {key1}")
+        for key1 in self._parse_cache.keys():
+            for key2 in self._parse_cache[key1]["children"].keys():
+                logging.critical(f"2, {key2}")
+        for key1 in self._parse_cache.keys():
+            for key2 in self._parse_cache[key1]["children"].keys():
+                for key3 in self._parse_cache[key1]["children"][key2]["children"].keys():
+                    logging.critical(f"3, {key3}")
+
+        for step in self.steps:
+            logging.critical(
+                f"Step: {step.reportable_form()}\n"
+            )
         for i, d in enumerate(parser.get_dicts()):
             if i == dict_index:
                 default_params = d
