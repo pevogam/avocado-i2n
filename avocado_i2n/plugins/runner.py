@@ -199,7 +199,9 @@ class TestRunner(RunnerInterface):
         tasks = [*pre_tasks, task, *post_tasks]
         for task in tasks:
             if spawner == "lxc":
-                task.spawner_handle = host
+                import lxc
+
+                task.spawner_handle = lxc.Container(host)
             elif spawner == "remote":
                 task.spawner_handle = node.started_worker.get_session()
                 while True:
