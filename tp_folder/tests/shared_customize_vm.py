@@ -21,6 +21,7 @@ INTERFACE
 import tempfile
 import os
 import logging
+import sys
 
 # avocado imports
 from avocado.core import exceptions
@@ -39,7 +40,7 @@ log = logging.getLogger('avocado.test.log')
 ###############################################################################
 
 
-source_avocado_path = "/usr/lib/python3.13/site-packages/avocado/utils"
+source_avocado_path = f"/usr/lib/python{sys.version_info.major}.{sys.version_info.minor}/site-packages/avocado/utils"
 destination_avocado_path = "/tmp/utils/avocado"
 
 
