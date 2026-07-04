@@ -370,6 +370,14 @@ class TestRunner(RunnerInterface):
             )
         except asyncio.TimeoutError as error:
             logging.error(error)
+            import stackscope
+
+            logging.critical(
+                "Timeout exceeded. Printing stacks of all running coroutines:"
+            )
+            for task in asyncio.all_tasks(self.loop):
+                coro = task.get_coro()
+                logging.critical(stackscope.extract(coro))
         except KeyboardInterrupt as error:
             logging.info(error)
             self.job.interrupted_reason = str(error)
@@ -400,6 +408,7 @@ class TestRunner(RunnerInterface):
             self.job.config.get("run.status_server_listen"), self.status_repo
         )
 
+        self.loop.set_debug(True)
         asyncio.set_event_loop(self.loop)
         self.loop.run_until_complete(self.status_server.create_server())
         self.loop.create_task(self.status_server.serve_forever())
